@@ -119,7 +119,7 @@
             padding: 1rem 0.5rem;
             background: none;
             border: none;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             font-weight: bold;
             color: #4b5563;
             text-align: center;
@@ -316,13 +316,33 @@
                 </div>
             </div>
         </div>
+
+        <!-- TAB 4: ADMIN USER MANAGEMENT -->
+        <div id="admin-section" class="section">
+            <div class="card">
+                <h2>Pending & Approved Staff Accounts</h2>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Email</th>
+                                <th>Status / Role</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Navigation Bar -->
     <div class="tabs app-content" id="app-nav">
-        <button class="tab-btn active" onclick="switchTab('pos', this)">POS Checkout</button>
+        <button class="tab-btn active" onclick="switchTab('pos', this)">POS</button>
         <button class="tab-btn" onclick="switchTab('inventory', this)">Inventory</button>
         <button class="tab-btn" onclick="switchTab('dashboard', this)">Dashboard</button>
+        <button class="tab-btn" onclick="switchTab('admin', this)" id="admin-tab-btn" style="display:none;">Admin</button>
     </div>
 
     <script type="module">
@@ -330,16 +350,47 @@
         let sales = [];
         let cart = [];
         let isSignUpMode = false;
+        let currentUserRole = 'staff';
 
         setTimeout(() => {
             const auth = window.auth;
             const db = window.database;
 
-            window.onAuthStateChanged(auth, (user) => {
+            window.onAuthStateChanged(auth, async (user) => {
                 if (user) {
+                    const userRef = window.dbRef(db, 'users/' + user.uid);
+                    const snapshot = await window.dbGet(userRef);
+                    
+                    if (!snapshot.exists()) {
+                        window.dbSet(userRef, {
+                            email: user.email,
+                            status: 'pending',
+                            role: 'staff'
+                        });
+                        alert('Account registered! Please wait for admin approval before logging in.');
+                        window.signOut(auth);
+                        return;
+                    }
+
+                    const userData = snapshot.val();
+                    if (userData.status !== 'approved') {
+                        alert('Your account is pending admin approval.');
+                        window.signOut(auth);
+                        return;
+                    }
+
+                    currentUserRole = userData.role || 'staff';
+
                     document.getElementById('auth-screen').style.display = 'none';
                     document.querySelectorAll('.app-content').forEach(el => el.style.display = 'block');
                     document.getElementById('header-actions').style.display = 'flex';
+                    
+                    if (currentUserRole === 'admin') {
+                        document.getElementById('admin-tab-btn').style.display = 'block';
+                    } else {
+                        document.getElementById('admin-tab-btn').style.display = 'none';
+                    }
+
                     loadAppData();
                 } else {
                     document.getElementById('auth-screen').style.display = 'flex';
@@ -368,7 +419,6 @@
 
             if(isSignUpMode) {
                 window.createUserWithEmailAndPassword(auth, email, password)
-                    .then(() => alert('Account created successfully!'))
                     .catch(err => alert(err.message));
             } else {
                 window.signInWithEmailAndPassword(auth, email, password)
@@ -403,6 +453,12 @@
                     updateDashboard();
                 }
             });
+
+            if (currentUserRole === 'admin') {
+                window.dbOnValue(window.dbRef(db, 'users'), (snapshot) => {
+                    renderUsersTable(snapshot.val() || {});
+                });
+            }
         }
 
         window.manualSync = async function() {
@@ -441,6 +497,7 @@
                 document.getElementById('dashboard-section').classList.add('active');
                 updateDashboard();
             }
+            if(tabName === 'admin') document.getElementById('admin-section').classList.add('active');
             btn.classList.add('active');
         }
 
@@ -671,6 +728,51 @@
                     </tr>
                 `;
             });
+        }
+
+        function renderUsersTable(usersObj) {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+            
+            Object.keys(usersObj).forEach(uid => {
+                const u = usersObj[uid];
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${u.email}</td>
+                        <td>
+                            <b>Status:</b> ${u.status} <br>
+                            <b>Role:</b> 
+                            <select onchange="updateUserRole('${uid}', this.value)" style="padding:0.2rem; width:auto; margin-top:4px;">
+                                <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>Staff</option>
+                                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            </select>
+                        </td>
+                        <td>
+                            ${u.status === 'pending' ? `<button onclick="approveUser('${uid}')" style="background:#047857; color:white; padding:0.3rem 0.5rem; border:none; border-radius:4px; cursor:pointer; margin-bottom:4px;">Approve</button>` : ''}
+                            <button onclick="deleteUserRecord('${uid}')" style="background:#dc2626; color:white; padding:0.3rem 0.5rem; border:none; border-radius:4px; cursor:pointer;">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        window.approveUser = function(uid) {
+            const db = window.database;
+            window.dbSet(window.dbRef(db, 'users/' + uid + '/status'), 'approved').then(() => {
+                alert('User approved successfully!');
+            });
+        }
+
+        window.updateUserRole = function(uid, newRole) {
+            const db = window.database;
+            window.dbSet(window.dbRef(db, 'users/' + uid + '/role'), newRole);
+        }
+
+        window.deleteUserRecord = function(uid) {
+            if(confirm('Are you sure you want to remove this user profile?')) {
+                const db = window.database;
+                window.dbSet(window.dbRef(db, 'users/' + uid), null);
+            }
         }
     </script>
 </body>
