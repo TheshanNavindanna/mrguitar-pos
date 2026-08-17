@@ -7,10 +7,11 @@
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a1a">
     
-    <!-- Firebase App (Modular SDK) -->
+    <!-- Firebase App & Auth SDKs -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getDatabase, ref, set, onValue, get, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         // TODO: Replace these fields with your own free Firebase project config credentials
         const firebaseConfig = {
@@ -25,6 +26,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        const auth = getAuth(app);
 
         window.dbRef = ref;
         window.dbSet = set;
@@ -32,6 +34,11 @@
         window.dbPush = push;
         window.dbOnValue = onValue;
         window.database = db;
+        window.auth = auth;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signOut = signOut;
+        window.onAuthStateChanged = onAuthStateChanged;
     </script>
 
     <style>
@@ -57,19 +64,45 @@
             font-weight: bold;
         }
 
-        .refresh-btn {
+        .header-actions { display: flex; gap: 0.5rem; }
+        .action-btn {
             background: var(--primary);
             color: white;
             border: none;
-            padding: 0.4rem 0.8rem;
+            padding: 0.4rem 0.6rem;
             border-radius: 4px;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: bold;
             cursor: pointer;
         }
-        .refresh-btn:active { background: var(--primary-dark); }
+        .action-btn:active { background: var(--primary-dark); }
+        .btn-danger-header { background: #dc2626; }
 
         .container { padding: 1rem; max-width: 600px; margin: 0 auto; }
+
+        /* Auth Screen Styling */
+        #auth-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 80vh;
+            padding: 1rem;
+        }
+        .auth-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+        }
+        .auth-card h2 { margin-bottom: 1rem; color: #111827; }
+        .auth-toggle { margin-top: 1rem; font-size: 0.9rem; color: #4b5563; cursor: pointer; }
+        .auth-toggle span { color: var(--primary); font-weight: bold; }
+
+        .app-content { display: none; }
 
         .tabs {
             display: flex;
@@ -132,7 +165,6 @@
             text-align: center;
         }
         button.btn:active { background: var(--primary-dark); }
-        button.btn-danger { background: #dc2626; margin-top: 0.5rem; }
 
         .item-grid {
             display: grid;
@@ -170,10 +202,27 @@
 
     <header>
         <span>Mr. Guitar - Beliatta</span>
-        <button class="refresh-btn" onclick="manualSync()">🔄 Refresh</button>
+        <div class="header-actions" id="header-actions" style="display: none;">
+            <button class="action-btn" onclick="manualSync()">🔄 Refresh</button>
+            <button class="action-btn btn-danger-header" onclick="logoutUser()">Logout</button>
+        </div>
     </header>
 
-    <div class="container">
+    <!-- AUTHENTICATION SCREEN -->
+    <div id="auth-screen">
+        <div class="auth-card">
+            <h2 id="auth-title">Staff Login</h2>
+            <input type="email" id="auth-email" placeholder="Email Address">
+            <input type="password" id="auth-password" placeholder="Password">
+            <button class="btn" id="auth-submit-btn" onclick="handleAuth()">Login</button>
+            <div class="auth-toggle" onclick="toggleAuthMode()">
+                <span id="auth-toggle-text">Need an account? Sign Up</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP CONTENT (Hidden until logged in) -->
+    <div class="container app-content" id="app-content">
         <!-- TAB 1: POS CHECKOUT -->
         <div id="pos-section" class="section active">
             <div class="card">
@@ -270,23 +319,75 @@
     </div>
 
     <!-- Navigation Bar -->
-    <div class="tabs">
+    <div class="tabs app-content" id="app-nav" style="display: none;">
         <button class="tab-btn active" onclick="switchTab('pos', this)">POS Checkout</button>
         <button class="tab-btn" onclick="switchTab('inventory', this)">Inventory</button>
         <button class="tab-btn" onclick="switchTab('dashboard', this)">Dashboard</button>
     </div>
 
     <script type="module">
-        import { getDatabase, ref, set, onValue, get, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
         let inventory = {};
         let sales = [];
         let cart = [];
+        let isSignUpMode = false;
 
         setTimeout(() => {
+            const auth = window.auth;
+            const db = window.database;
+
+            // Listen for login/logout state changes
+            window.onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    // User is signed in
+                    document.getElementById('auth-screen').style.display = 'none';
+                    document.querySelectorAll('.app-content').forEach(el => el.style.display = 'block');
+                    document.getElementById('header-actions').style.display = 'flex';
+                    loadAppData();
+                } else {
+                    // User is signed out
+                    document.getElementById('auth-screen').style.display = 'flex';
+                    document.querySelectorAll('.app-content').forEach(el => el.style.display = 'none');
+                    document.getElementById('header-actions').style.display = 'none';
+                }
+            });
+        }, 500);
+
+        window.toggleAuthMode = function() {
+            isSignUpMode = !isSignUpMode;
+            document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Staff Account' : 'Staff Login';
+            document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Login';
+            document.getElementById('auth-toggle-text').innerText = isSignUpMode ? 'Already have an account? Login' : 'Need an account? Sign Up';
+        }
+
+        window.handleAuth = function() {
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const auth = window.auth;
+
+            if(!email || !password) {
+                alert('Please enter both email and password.');
+                return;
+            }
+
+            if(isSignUpMode) {
+                window.createUserWithEmailAndPassword(auth, email, password)
+                    .then(() => alert('Account created successfully!'))
+                    .catch(err => alert(err.message));
+            } else {
+                window.signInWithEmailAndPassword(auth, email, password)
+                    .catch(err => alert(err.message));
+            }
+        }
+
+        window.logoutUser = function() {
+            window.signOut(window.auth).then(() => {
+                alert('Logged out successfully');
+            });
+        }
+
+        function loadAppData() {
             const db = window.database;
             
-            // Auto Listeners
             window.dbOnValue(window.dbRef(db, 'inventory'), (snapshot) => {
                 inventory = snapshot.val() || {};
                 renderInventory();
@@ -305,7 +406,7 @@
                     updateDashboard();
                 }
             });
-        }, 500);
+        }
 
         window.manualSync = async function() {
             const db = window.database;
