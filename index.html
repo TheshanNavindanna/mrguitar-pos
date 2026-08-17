@@ -113,23 +113,28 @@
             width: 100%;
             border-top: 1px solid var(--border);
             z-index: 1000;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
         }
         .tab-btn {
             flex: 1;
-            padding: 1rem 0.5rem;
+            padding: 0.8rem 0.2rem;
             background: none;
             border: none;
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: bold;
             color: #4b5563;
             text-align: center;
             cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .tab-btn.active {
             color: var(--primary);
             border-top: 3px solid var(--primary);
             background: #fffbeb;
         }
+        
 
         .section { display: none; }
         .section.active { display: block; }
