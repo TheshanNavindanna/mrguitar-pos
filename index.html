@@ -13,10 +13,10 @@
         import { getDatabase, ref, set, onValue, get, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-        // TODO: Replace these fields with your own free Firebase project config credentials
         const firebaseConfig = {
             apiKey: "AIzaSyAmjPncy6Css6xOTF1E97Xb6eZO9tXUhok",
             authDomain: "mrguitarpos.firebaseapp.com",
+            databaseURL: "https://mrguitarpos-default-rtdb.firebaseio.com",
             projectId: "mrguitarpos",
             storageBucket: "mrguitarpos.firebasestorage.app",
             messagingSenderId: "730797498075",
@@ -319,7 +319,7 @@
     </div>
 
     <!-- Navigation Bar -->
-    <div class="tabs app-content" id="app-nav" style="display: none;">
+    <div class="tabs app-content" id="app-nav">
         <button class="tab-btn active" onclick="switchTab('pos', this)">POS Checkout</button>
         <button class="tab-btn" onclick="switchTab('inventory', this)">Inventory</button>
         <button class="tab-btn" onclick="switchTab('dashboard', this)">Dashboard</button>
@@ -335,16 +335,13 @@
             const auth = window.auth;
             const db = window.database;
 
-            // Listen for login/logout state changes
             window.onAuthStateChanged(auth, (user) => {
                 if (user) {
-                    // User is signed in
                     document.getElementById('auth-screen').style.display = 'none';
                     document.querySelectorAll('.app-content').forEach(el => el.style.display = 'block');
                     document.getElementById('header-actions').style.display = 'flex';
                     loadAppData();
                 } else {
-                    // User is signed out
                     document.getElementById('auth-screen').style.display = 'flex';
                     document.querySelectorAll('.app-content').forEach(el => el.style.display = 'none');
                     document.getElementById('header-actions').style.display = 'none';
