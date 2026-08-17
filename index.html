@@ -6,6 +6,34 @@
     <title>Mr. Guitar - Beliatta POS</title>
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#1a1a1a">
+    
+    <!-- Firebase App (Modular SDK) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        // TODO: Replace these fields with your own free Firebase project config credentials
+        const firebaseConfig = {
+            apiKey: "AIzaSyAmjPncy6Css6xOTF1E97Xb6eZO9tXUhok",
+            authDomain: "mrguitarpos.firebaseapp.com",
+            projectId: "mrguitarpos",
+            storageBucket: "mrguitarpos.firebasestorage.app",
+            messagingSenderId: "730797498075",
+            appId: "1:730797498075:web:36e2b2e8a496602c33b6fe",
+            measurementId: "G-H5SMTVZ7MK"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Make database functions globally available for the app UI
+        window.dbRef = ref;
+        window.dbSet = set;
+        window.dbPush = push;
+        window.dbOnValue = onValue;
+        window.database = db;
+    </script>
+
     <style>
         :root {
             --primary: #d97706;
@@ -29,7 +57,6 @@
 
         .container { padding: 1rem; max-width: 600px; margin: 0 auto; }
 
-        /* Tabs */
         .tabs {
             display: flex;
             background: #fff;
@@ -60,7 +87,6 @@
         .section { display: none; }
         .section.active { display: block; }
 
-        /* Cards & UI Elements */
         .card {
             background: var(--card-bg);
             border-radius: 8px;
@@ -94,7 +120,6 @@
         button.btn:active { background: var(--primary-dark); }
         button.btn-danger { background: #dc2626; margin-top: 0.5rem; }
 
-        /* POS Grid & Lists */
         .item-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -111,7 +136,6 @@
             text-align: left;
             cursor: pointer;
         }
-        .pos-item-card:active { background: #e5e7eb; }
         .pos-item-card h4 { font-size: 0.95rem; }
         .pos-item-card p { font-size: 0.85rem; color: #6b7280; }
 
@@ -224,7 +248,6 @@
                         <tbody id="sales-table-body"></tbody>
                     </table>
                 </div>
-                <button class="btn btn-danger" onclick="clearData()" style="margin-top: 1rem;">Reset All App Data</button>
             </div>
         </div>
     </div>
@@ -236,20 +259,41 @@
         <button class="tab-btn" onclick="switchTab('dashboard', this)">Dashboard</button>
     </div>
 
-    <script>
-        let inventory = JSON.parse(localStorage.getItem('mg_inventory')) || [
-            { id: 1, name: 'Acoustic Guitar', category: 'Guitars (New/Used)', buyPrice: 20000, price: 25000, stock: 5 },
-            { id: 2, name: 'Guitar Strings Set', category: 'Accessories', buyPrice: 800, price: 1200, stock: 25 }
-        ];
-        let sales = JSON.parse(localStorage.getItem('mg_sales')) || [];
+    <script type="module">
+        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        let inventory = {};
+        let sales = [];
         let cart = [];
 
-        function saveData() {
-            localStorage.setItem('mg_inventory', JSON.stringify(inventory));
-            localStorage.setItem('mg_sales', JSON.stringify(sales));
-        }
+        // Wait a second for firebase to initialize, then bind listeners
+        setTimeout(() => {
+            const db = window.database;
+            
+            // Listen to Inventory Changes from Cloud Database
+            window.dbOnValue(window.dbRef(db, 'inventory'), (snapshot) => {
+                const data = snapshot.val();
+                inventory = data || {};
+                renderInventory();
+                renderPOSItems();
+            });
 
-        function switchTab(tabName, btn) {
+            // Listen to Sales Changes from Cloud Database
+            window.dbOnValue(window.dbRef(db, 'sales'), (snapshot) => {
+                const data = snapshot.val();
+                sales = [];
+                if(data) {
+                    Object.keys(data).forEach(key => {
+                        sales.push({ id: key, ...data[key] });
+                    });
+                }
+                if(document.getElementById('dashboard-section').classList.contains('active')) {
+                    updateDashboard();
+                }
+            });
+        }, 500);
+
+        window.switchTab = function(tabName, btn) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             
@@ -262,7 +306,7 @@
             btn.classList.add('active');
         }
 
-        function saveItem() {
+        window.saveItem = function() {
             const id = document.getElementById('item-id').value;
             const name = document.getElementById('item-name').value;
             const category = document.getElementById('item-category').value;
@@ -275,44 +319,47 @@
                 return;
             }
 
-            if(id) {
-                const item = inventory.find(i => i.id == id);
-                item.name = name; item.category = category; item.buyPrice = buyPrice; item.price = price; item.stock = stock;
-            } else {
-                inventory.push({ id: Date.now(), name, category, buyPrice, price, stock });
-            }
+            const db = window.database;
+            const itemId = id ? id : 'item_' + Date.now();
 
-            document.getElementById('item-id').value = '';
-            document.getElementById('item-name').value = '';
-            document.getElementById('item-buy-price').value = '';
-            document.getElementById('item-price').value = '';
-            document.getElementById('item-stock').value = '';
-
-            saveData();
-            renderInventory();
-            renderPOSItems();
+            window.dbSet(window.dbRef(db, 'inventory/' + itemId), {
+                id: itemId,
+                name,
+                category,
+                buyPrice,
+                price,
+                stock
+            }).then(() => {
+                document.getElementById('item-id').value = '';
+                document.getElementById('item-name').value = '';
+                document.getElementById('item-buy-price').value = '';
+                document.getElementById('item-price').value = '';
+                document.getElementById('item-stock').value = '';
+                alert('Item saved successfully to cloud!');
+            });
         }
 
         function renderInventory() {
             const tbody = document.getElementById('inventory-table-body');
             tbody.innerHTML = '';
-            inventory.forEach(item => {
+            Object.keys(inventory).forEach(key => {
+                const item = inventory[key];
                 tbody.innerHTML += `
                     <tr>
                         <td><b>${item.name}</b><br><small>${item.category}</small></td>
                         <td>Buy: ${item.buyPrice.toLocaleString()}<br>Sell: ${item.price.toLocaleString()}</td>
                         <td>${item.stock}</td>
                         <td>
-                            <button onclick="editItem(${item.id})" style="padding:0.2rem 0.4rem;">Edit</button>
-                            <button onclick="deleteItem(${item.id})" style="padding:0.2rem 0.4rem; background:#dc2626; color:#fff; border:none;">Del</button>
+                            <button onclick="editItem('${item.id}')" style="padding:0.2rem 0.4rem;">Edit</button>
+                            <button onclick="deleteItem('${item.id}')" style="padding:0.2rem 0.4rem; background:#dc2626; color:#fff; border:none;">Del</button>
                         </td>
                     </tr>
                 `;
             });
         }
 
-        function editItem(id) {
-            const item = inventory.find(i => i.id == id);
+        window.editItem = function(id) {
+            const item = inventory[id];
             document.getElementById('item-id').value = item.id;
             document.getElementById('item-name').value = item.name;
             document.getElementById('item-category').value = item.category;
@@ -322,26 +369,27 @@
             switchTab('inventory', document.querySelectorAll('.tab-btn')[1]);
         }
 
-        function deleteItem(id) {
-            inventory = inventory.filter(i => i.id != id);
-            saveData();
-            renderInventory();
-            renderPOSItems();
+        window.deleteItem = function(id) {
+            const db = window.database;
+            window.dbSet(window.dbRef(db, 'inventory/' + id), null);
         }
 
         function renderPOSItems(filter = '') {
             const container = document.getElementById('pos-items-container');
             container.innerHTML = '';
-            const filtered = inventory.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()) && i.stock > 0);
+            
+            const keys = Object.keys(inventory);
+            const filtered = keys.filter(k => inventory[k].name.toLowerCase().includes(filter.toLowerCase()) && inventory[k].stock > 0);
             
             if(filtered.length === 0) {
                 container.innerHTML = '<p style="grid-column: span 2; color:#6b7280; text-align:center;">No items found</p>';
                 return;
             }
 
-            filtered.forEach(item => {
+            filtered.forEach(k => {
+                const item = inventory[k];
                 container.innerHTML += `
-                    <div class="pos-item-card" onclick="addToCart(${item.id})">
+                    <div class="pos-item-card" onclick="addToCart('${item.id}')">
                         <h4>${item.name}</h4>
                         <p>LKR ${item.price.toLocaleString()}</p>
                         <p><small>Stock: ${item.stock}</small></p>
@@ -350,12 +398,12 @@
             });
         }
 
-        function filterPOSItems() {
+        window.filterPOSItems = function() {
             renderPOSItems(document.getElementById('pos-search').value);
         }
 
-        function addToCart(id) {
-            const item = inventory.find(i => i.id == id);
+        window.addToCart = function(id) {
+            const item = inventory[id];
             const cartItem = cart.find(c => c.id == id);
 
             if(cartItem) {
@@ -395,7 +443,7 @@
             document.getElementById('cart-total').innerText = total.toLocaleString();
         }
 
-        function editCartPrice(index) {
+        window.editCartPrice = function(index) {
             const current = cart[index];
             const newPrice = prompt(`Enter new selling price for ${current.name} (LKR):`, current.price);
             if(newPrice !== null && !isNaN(newPrice) && newPrice.trim() !== "") {
@@ -404,27 +452,33 @@
             }
         }
 
-        function removeFromCart(index) {
+        window.removeFromCart = function(index) {
             cart.splice(index, 1);
             renderCart();
         }
 
-        function completeCheckout() {
+        window.completeCheckout = function() {
             if(cart.length === 0) return alert('Cart is empty');
             
             let totalRev = 0;
             let totalCost = 0;
+            const db = window.database;
             
             cart.forEach(c => {
                 totalRev += c.price * c.qty;
                 totalCost += c.buyPrice * c.qty;
-                const invItem = inventory.find(i => i.id == c.id);
-                if(invItem) invItem.stock -= c.qty;
+                const invItem = inventory[c.id];
+                if(invItem) {
+                    invItem.stock -= c.qty;
+                    // Update stock in cloud database
+                    window.dbSet(window.dbRef(db, 'inventory/' + c.id + '/stock'), invItem.stock);
+                }
             });
 
             const profit = totalRev - totalCost;
 
-            sales.push({
+            // Push sale record to cloud database
+            window.dbPush(window.dbRef(db, 'sales'), {
                 timestamp: new Date().getTime(),
                 dateStr: new Date().toLocaleDateString(),
                 timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -434,14 +488,11 @@
             });
 
             cart = [];
-            saveData();
             renderCart();
-            renderInventory();
-            renderPOSItems();
-            alert('Sale Completed Successfully!');
+            alert('Sale Completed Successfully & Synced across devices!');
         }
 
-        function updateDashboard() {
+        window.updateDashboard = function() {
             const filterType = document.getElementById('report-filter').value;
             const now = new Date();
             
@@ -455,7 +506,7 @@
                 } else if(filterType === 'month') {
                     return sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear();
                 }
-                return true; // 'all'
+                return true; 
             });
 
             let totalRev = 0;
@@ -485,16 +536,6 @@
                 `;
             });
         }
-
-        function clearData() {
-            if(confirm('Are you sure you want to clear all data?')) {
-                localStorage.clear();
-                location.reload();
-            }
-        }
-
-        renderInventory();
-        renderPOSItems();
     </script>
 </body>
 </html>
