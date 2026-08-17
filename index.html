@@ -105,30 +105,33 @@
         .app-content { display: none; }
 
         .tabs {
-            display: flex;
-            background: #fff;
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            border-top: 1px solid var(--border);
-            z-index: 1000;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
-        }
-        .tab-btn {
-            flex: 1;
-            padding: 0.6rem 0.1rem;
-            background: none;
-            border: none;
-            font-size: 0.7rem;
-            font-weight: bold;
-            color: #4b5563;
-            text-align: center;
-            cursor: pointer;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
+    display: flex;
+    flex-wrap: nowrap; /* Ensures all buttons stay on a single line */
+    background: #fff;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    border-top: 1px solid var(--border);
+    z-index: 1000;
+    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.tab-btn {
+    flex: 1 1 0; /* Forces buttons to evenly share available space and shrink if necessary */
+    min-width: 0; /* Allows text-overflow ellipsis to work properly in flex items */
+    padding: 0.6rem 0.2rem;
+    background: none;
+    border: none;
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #4b5563;
+    text-align: center;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
         .tab-btn.active {
             color: var(--primary);
             border-top: 3px solid var(--primary);
