@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mr. Guitar - Beliatta POS</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1a1a1a">
+    <style>
+        :root {
+            --primary: #d97706;
+            --primary-dark: #b45309;
+            --bg: #f3f4f6;
+            --card-bg: #ffffff;
+            --text: #1f2937;
+            --border: #e5e7eb;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
+        
+        header {
+            background: #111827;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: bold;
+        }
+
+        .container { padding: 1rem; max-width: 600px; margin: 0 auto; }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: #fff;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            border-top: 1px solid var(--border);
+            z-index: 1000;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 1rem 0.5rem;
+            background: none;
+            border: none;
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: #4b5563;
+            text-align: center;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            color: var(--primary);
+            border-top: 3px solid var(--primary);
+            background: #fffbeb;
+        }
+
+        .section { display: none; }
+        .section.active { display: block; }
+
+        /* Cards & UI Elements */
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #111827; }
+
+        input, select {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        button.btn {
+            width: 100%;
+            padding: 0.85rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+        }
+        button.btn:active { background: var(--primary-dark); }
+        button.btn-danger { background: #dc2626; margin-top: 0.5rem; }
+
+        /* POS Grid & Lists */
+        .item-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            max-height: 250px;
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+        .pos-item-card {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            border-radius: 6px;
+            text-align: left;
+            cursor: pointer;
+        }
+        .pos-item-card:active { background: #e5e7eb; }
+        .pos-item-card h4 { font-size: 0.95rem; }
+        .pos-item-card p { font-size: 0.85rem; color: #6b7280; }
+
+        .cart-list { list-style: none; margin-bottom: 1rem; max-height: 150px; overflow-y: auto; }
+        .cart-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+
+        .stats-box { display: flex; gap: 1rem; margin-bottom: 1rem; }
+        .stat-card { flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 1rem; border-radius: 8px; text-align: center; }
+        .stat-card h3 { font-size: 1.25rem; color: #b45309; }
+        .stat-card p { font-size: 0.85rem; color: #78350f; }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
+    </style>
+</head>
+<body>
+
+    <header>Mr. Guitar - Beliatta</header>
+
+    <div class="container">
+        <!-- TAB 1: POS CHECKOUT -->
+        <div id="pos-section" class="section active">
+            <div class="card">
+                <h2>Point of Sale (Checkout)</h2>
+                <input type="text" id="pos-search" placeholder="Search item..." oninput="filterPOSItems()">
+                <div class="item-grid" id="pos-items-container">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Current Cart</h2>
+                <ul class="cart-list" id="cart-list">
+                    <li style="color: #6b7280; text-align: center;">Cart is empty</li>
+                </ul>
+                <h3 style="margin-bottom: 1rem;">Total: LKR <span id="cart-total">0.00</span></h3>
+                <button class="btn" onclick="completeCheckout()">Complete Sale (Cash)</button>
+            </div>
+        </div>
+
+        <!-- TAB 2: INVENTORY -->
+        <div id="inventory-section" class="section">
+            <div class="card">
+                <h2>Add / Manage Inventory</h2>
+                <input type="hidden" id="item-id">
+                <input type="text" id="item-name" placeholder="Item Name (e.g., Acoustic Guitar / Strings)">
+                <select id="item-category">
+                    <option value="Guitars (New/Used)">Guitars (New/Used)</option>
+                    <option value="Accessories">Accessories</option>
+                    <option value="Repair Parts">Repair Parts</option>
+                    <option value="Rentals">Rentals</option>
+                </select>
+                <input type="number" id="item-price" placeholder="Price (LKR)">
+                <input type="number" id="item-stock" placeholder="Stock Quantity">
+                <button class="btn" onclick="saveItem()">Save Item to Inventory</button>
+            </div>
+
+            <div class="card">
+                <h2>Inventory List</h2>
+                <div style="max-height: 250px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Price (LKR)</th>
+                                <th>Stock</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: DASHBOARD & SALES -->
+        <div id="dashboard-section" class="section">
+            <div class="stats-box">
+                <div class="stat-card">
+                    <h3 id="today-revenue">0.00</h3>
+                    <p>Today Revenue (LKR)</p>
+                </div>
+                <div class="stat-card">
+                    <h3 id="total-items-count">0</h3>
+                    <p>Stock Items</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Recent Sales History</h2>
+                <div style="max-height: 300px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Items</th>
+                                <th>Total (LKR)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-table-body">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <button class="btn btn-danger" onclick="clearData()" style="margin-top: 1rem;">Reset All App Data</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('pos', this)">POS Checkout</button>
+        <button class="tab-btn" onclick="switchTab('inventory', this)">Inventory</button>
+        <button class="tab-btn" onclick="switchTab('dashboard', this)">Dashboard</button>
+    </div>
+
+    <script>
+        // Data States
+        let inventory = JSON.parse(localStorage.getItem('mg_inventory')) || [
+            { id: 1, name: 'Acoustic Guitar (Basic)', category: 'Guitars (New/Used)', price: 25000, stock: 5 },
+            { id: 2, name: 'Guitar Strings Set', category: 'Accessories', price: 1200, stock: 25 },
+            { id: 3, name: 'Guitar Capo', category: 'Accessories', price: 800, stock: 15 }
+        ];
+        let sales = JSON.parse(localStorage.getItem('mg_sales')) || [];
+        let cart = [];
+
+        function saveData() {
+            localStorage.setItem('mg_inventory', JSON.stringify(inventory));
+            localStorage.setItem('mg_sales', JSON.stringify(sales));
+        }
+
+        // Tab Switching
+        function switchTab(tabName, btn) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            
+            if(tabName === 'pos') document.getElementById('pos-section').classList.add('active');
+            if(tabName === 'inventory') document.getElementById('inventory-section').classList.add('active');
+            if(tabName === 'dashboard') {
+                document.getElementById('dashboard-section').classList.add('active');
+                updateDashboard();
+            }
+            btn.classList.add('active');
+        }
+
+        // Inventory Functions
+        function saveItem() {
+            const id = document.getElementById('item-id').value;
+            const name = document.getElementById('item-name').value;
+            const category = document.getElementById('item-category').value;
+            const price = parseFloat(document.getElementById('item-price').value);
+            const stock = parseInt(document.getElementById('item-stock').value);
+
+            if(!name || isNaN(price) || isNaN(stock)) {
+                alert('Please fill out all fields correctly.');
+                return;
+            }
+
+            if(id) {
+                const item = inventory.find(i => i.id == id);
+                item.name = name; item.category = category; item.price = price; item.stock = stock;
+            } else {
+                inventory.push({ id: Date.now(), name, category, price, stock });
+            }
+
+            document.getElementById('item-id').value = '';
+            document.getElementById('item-name').value = '';
+            document.getElementById('item-price').value = '';
+            document.getElementById('item-stock').value = '';
+
+            saveData();
+            renderInventory();
+            renderPOSItems();
+        }
+
+        function renderInventory() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = '';
+            inventory.forEach(item => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td><b>${item.name}</b><br><small>${item.category}</small></td>
+                        <td>${item.price.toLocaleString()}</td>
+                        <td>${item.stock}</td>
+                        <td>
+                            <button onclick="editItem(${item.id})" style="padding:0.2rem 0.5rem;">Edit</button>
+                            <button onclick="deleteItem(${item.id})" style="padding:0.2rem 0.5rem; background:#dc2626; color:#fff; border:none;">Del</button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function editItem(id) {
+            const item = inventory.find(i => i.id == id);
+            document.getElementById('item-id').value = item.id;
+            document.getElementById('item-name').value = item.name;
+            document.getElementById('item-category').value = item.category;
+            document.getElementById('item-price').value = item.price;
+            document.getElementById('item-stock').value = item.stock;
+            switchTab('inventory', document.querySelectorAll('.tab-btn')[1]);
+        }
+
+        function deleteItem(id) {
+            inventory = inventory.filter(i => i.id != id);
+            saveData();
+            renderInventory();
+            renderPOSItems();
+        }
+
+        // POS Functions
+        function renderPOSItems(filter = '') {
+            const container = document.getElementById('pos-items-container');
+            container.innerHTML = '';
+            const filtered = inventory.filter(i => i.name.toLowerCase().includes(filter.toLowerCase()) && i.stock > 0);
+            
+            if(filtered.length === 0) {
+                container.innerHTML = '<p style="grid-column: span 2; color:#6b7280; text-align:center;">No items found</p>';
+                return;
+            }
+
+            filtered.forEach(item => {
+                container.innerHTML += `
+                    <div class="pos-item-card" onclick="addToCart(${item.id})">
+                        <h4>${item.name}</h4>
+                        <p>LKR ${item.price.toLocaleString()}</p>
+                        <p><small>Stock: ${item.stock}</small></p>
+                    </div>
+                `;
+            });
+        }
+
+        function filterPOSItems() {
+            renderPOSItems(document.getElementById('pos-search').value);
+        }
+
+        function addToCart(id) {
+            const item = inventory.find(i => i.id == id);
+            const cartItem = cart.find(c => c.id == id);
+
+            if(cartItem) {
+                if(cartItem.qty < item.stock) cartItem.qty++;
+                else alert('Not enough stock available!');
+            } else {
+                cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });
+            }
+            renderCart();
+        }
+
+        function renderCart() {
+            const list = document.getElementById('cart-list');
+            let total = 0;
+            if(cart.length === 0) {
+                list.innerHTML = '<li style="color: #6b7280; text-align: center;">Cart is empty</li>';
+                document.getElementById('cart-total').innerText = '0.00';
+                return;
+            }
+
+            list.innerHTML = '';
+            cart.forEach((c, index) => {
+                total += c.price * c.qty;
+                list.innerHTML += `
+                    <li class="cart-item">
+                        <span>${c.name} (x${c.qty})</span>
+                        <span>LKR ${(c.price * c.qty).toLocaleString()} <button onclick="removeFromCart(${index})" style="background:none;border:none;color:red;margin-left:5px;cursor:pointer;">✕</button></span>
+                    </li>
+                `;
+            });
+            document.getElementById('cart-total').innerText = total.toLocaleString();
+        }
+
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            renderCart();
+        }
+
+        function completeCheckout() {
+            if(cart.length === 0) return alert('Cart is empty');
+            
+            let total = 0;
+            cart.forEach(c => {
+                total += c.price * c.qty;
+                const invItem = inventory.find(i => i.id == c.id);
+                if(invItem) invItem.stock -= c.qty;
+            });
+
+            sales.push({
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                date: new Date().toLocaleDateString(),
+                items: cart.map(c => `${c.name} (x${c.qty})`).join(', '),
+                total: total
+            });
+
+            cart = [];
+            saveData();
+            renderCart();
+            renderInventory();
+            renderPOSItems();
+            alert('Sale Completed Successfully!');
+        }
+
+        // Dashboard
+        function updateDashboard() {
+            const today = new Date().toLocaleDateString();
+            let todayRev = 0;
+            sales.filter(s => s.date === today).forEach(s => todayRev += s.total);
+
+            document.getElementById('today-revenue').innerText = todayRev.toLocaleString();
+            document.getElementById('total-items-count').innerText = inventory.reduce((acc, item) => acc + item.stock, 0);
+
+            const tbody = document.getElementById('sales-table-body');
+            tbody.innerHTML = '';
+            sales.slice().reverse().forEach(s => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${s.date} ${s.time}</td>
+                        <td>${s.items}</td>
+                        <td>${s.total.toLocaleString()}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function clearData() {
+            if(confirm('Are you sure you want to clear all data?')) {
+                localStorage.clear();
+                location.reload();
+            }
+        }
+
+        // Initial Load
+        renderInventory();
+        renderPOSItems();
+
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed', err));
+        }
+    </script>
+</body>
+</html>

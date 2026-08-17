@@ -1,0 +1,15 @@
+{
+  "name": "Mr. Guitar POS",
+  "short_name": "Mr. Guitar",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f3f4f6",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/ios-filled/512/1a1a1a/guitar.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
