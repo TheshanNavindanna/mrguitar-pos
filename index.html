@@ -10,7 +10,7 @@
     <!-- Firebase App (Modular SDK) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue, get, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         // TODO: Replace these fields with your own free Firebase project config credentials
         const firebaseConfig = {
@@ -26,9 +26,9 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // Make database functions globally available for the app UI
         window.dbRef = ref;
         window.dbSet = set;
+        window.dbGet = get;
         window.dbPush = push;
         window.dbOnValue = onValue;
         window.database = db;
@@ -50,10 +50,24 @@
             background: #111827;
             color: white;
             padding: 1rem;
-            text-align: center;
-            font-size: 1.25rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 1.1rem;
             font-weight: bold;
         }
+
+        .refresh-btn {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.4rem 0.8rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .refresh-btn:active { background: var(--primary-dark); }
 
         .container { padding: 1rem; max-width: 600px; margin: 0 auto; }
 
@@ -154,7 +168,10 @@
 </head>
 <body>
 
-    <header>Mr. Guitar - Beliatta</header>
+    <header>
+        <span>Mr. Guitar - Beliatta</span>
+        <button class="refresh-btn" onclick="manualSync()">🔄 Refresh</button>
+    </header>
 
     <div class="container">
         <!-- TAB 1: POS CHECKOUT -->
@@ -260,25 +277,22 @@
     </div>
 
     <script type="module">
-        import { getDatabase, ref, set, onValue, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { getDatabase, ref, set, onValue, get, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
         let inventory = {};
         let sales = [];
         let cart = [];
 
-        // Wait a second for firebase to initialize, then bind listeners
         setTimeout(() => {
             const db = window.database;
             
-            // Listen to Inventory Changes from Cloud Database
+            // Auto Listeners
             window.dbOnValue(window.dbRef(db, 'inventory'), (snapshot) => {
-                const data = snapshot.val();
-                inventory = data || {};
+                inventory = snapshot.val() || {};
                 renderInventory();
                 renderPOSItems();
             });
 
-            // Listen to Sales Changes from Cloud Database
             window.dbOnValue(window.dbRef(db, 'sales'), (snapshot) => {
                 const data = snapshot.val();
                 sales = [];
@@ -292,6 +306,32 @@
                 }
             });
         }, 500);
+
+        window.manualSync = async function() {
+            const db = window.database;
+            try {
+                const invSnap = await window.dbGet(window.dbRef(db, 'inventory'));
+                inventory = invSnap.val() || {};
+                
+                const salesSnap = await window.dbGet(window.dbRef(db, 'sales'));
+                const salesData = salesSnap.val();
+                sales = [];
+                if(salesData) {
+                    Object.keys(salesData).forEach(key => {
+                        sales.push({ id: key, ...salesData[key] });
+                    });
+                }
+
+                renderInventory();
+                renderPOSItems();
+                if(document.getElementById('dashboard-section').classList.contains('active')) {
+                    updateDashboard();
+                }
+                alert('Data refreshed successfully from cloud!');
+            } catch(e) {
+                alert('Failed to refresh data. Check internet connection.');
+            }
+        }
 
         window.switchTab = function(tabName, btn) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -470,14 +510,12 @@
                 const invItem = inventory[c.id];
                 if(invItem) {
                     invItem.stock -= c.qty;
-                    // Update stock in cloud database
                     window.dbSet(window.dbRef(db, 'inventory/' + c.id + '/stock'), invItem.stock);
                 }
             });
 
             const profit = totalRev - totalCost;
 
-            // Push sale record to cloud database
             window.dbPush(window.dbRef(db, 'sales'), {
                 timestamp: new Date().getTime(),
                 dateStr: new Date().toLocaleDateString(),

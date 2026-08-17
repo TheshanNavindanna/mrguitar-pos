@@ -1,0 +1,7 @@
+apiKey: "AIzaSyAmjPncy6Css6xOTF1E97Xb6eZO9tXUhok",
+            authDomain: "mrguitarpos.firebaseapp.com",
+            projectId: "mrguitarpos",
+            storageBucket: "mrguitarpos.firebasestorage.app",
+            messagingSenderId: "730797498075",
+            appId: "1:730797498075:web:36e2b2e8a496602c33b6fe",
+            measurementId: "G-H5SMTVZ7MK"
