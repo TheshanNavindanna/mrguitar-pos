@@ -115,15 +115,16 @@
         .pos-item-card h4 { font-size: 0.95rem; }
         .pos-item-card p { font-size: 0.85rem; color: #6b7280; }
 
-        .cart-list { list-style: none; margin-bottom: 1rem; max-height: 150px; overflow-y: auto; }
-        .cart-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.95rem; }
+        .cart-list { list-style: none; margin-bottom: 1rem; max-height: 180px; overflow-y: auto; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+        .cart-item-details { flex-grow: 1; margin-right: 0.5rem; }
 
-        .stats-box { display: flex; gap: 1rem; margin-bottom: 1rem; }
-        .stat-card { flex: 1; background: #fffbeb; border: 1px solid #fde68a; padding: 1rem; border-radius: 8px; text-align: center; }
-        .stat-card h3 { font-size: 1.25rem; color: #b45309; }
-        .stat-card p { font-size: 0.85rem; color: #78350f; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
+        .stat-card { background: #fffbeb; border: 1px solid #fde68a; padding: 0.85rem; border-radius: 8px; text-align: center; }
+        .stat-card h3 { font-size: 1.1rem; color: #b45309; }
+        .stat-card p { font-size: 0.8rem; color: #78350f; }
         
-        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
     </style>
 </head>
@@ -137,9 +138,7 @@
             <div class="card">
                 <h2>Point of Sale (Checkout)</h2>
                 <input type="text" id="pos-search" placeholder="Search item..." oninput="filterPOSItems()">
-                <div class="item-grid" id="pos-items-container">
-                    <!-- Populated dynamically -->
-                </div>
+                <div class="item-grid" id="pos-items-container"></div>
             </div>
 
             <div class="card">
@@ -157,14 +156,15 @@
             <div class="card">
                 <h2>Add / Manage Inventory</h2>
                 <input type="hidden" id="item-id">
-                <input type="text" id="item-name" placeholder="Item Name (e.g., Acoustic Guitar / Strings)">
+                <input type="text" id="item-name" placeholder="Item Name (e.g., Acoustic Guitar)">
                 <select id="item-category">
                     <option value="Guitars (New/Used)">Guitars (New/Used)</option>
                     <option value="Accessories">Accessories</option>
                     <option value="Repair Parts">Repair Parts</option>
                     <option value="Rentals">Rentals</option>
                 </select>
-                <input type="number" id="item-price" placeholder="Price (LKR)">
+                <input type="number" id="item-buy-price" placeholder="Buying Price / Cost (LKR)">
+                <input type="number" id="item-price" placeholder="Selling Price (LKR)">
                 <input type="number" id="item-stock" placeholder="Stock Quantity">
                 <button class="btn" onclick="saveItem()">Save Item to Inventory</button>
             </div>
@@ -176,14 +176,12 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>Price (LKR)</th>
+                                <th>Buy / Sell (LKR)</th>
                                 <th>Stock</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
-                        <tbody id="inventory-table-body">
-                            <!-- Populated dynamically -->
-                        </tbody>
+                        <tbody id="inventory-table-body"></tbody>
                     </table>
                 </div>
             </div>
@@ -191,31 +189,39 @@
 
         <!-- TAB 3: DASHBOARD & SALES -->
         <div id="dashboard-section" class="section">
-            <div class="stats-box">
+            <div class="card">
+                <h2>Sales & Profit Report Filter</h2>
+                <select id="report-filter" onchange="updateDashboard()">
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                    <option value="all">All Time</option>
+                </select>
+            </div>
+
+            <div class="stats-grid">
                 <div class="stat-card">
-                    <h3 id="today-revenue">0.00</h3>
-                    <p>Today Revenue (LKR)</p>
+                    <h3 id="rep-revenue">0.00</h3>
+                    <p>Total Revenue</p>
                 </div>
-                <div class="stat-card">
-                    <h3 id="total-items-count">0</h3>
-                    <p>Stock Items</p>
+                <div class="stat-card" style="background:#ecfdf5; border-color:#a7f3d0;">
+                    <h3 id="rep-profit" style="color:#047857;">0.00</h3>
+                    <p style="color:#065f46;">Total Profit</p>
                 </div>
             </div>
 
             <div class="card">
-                <h2>Recent Sales History</h2>
-                <div style="max-height: 300px; overflow-y: auto;">
+                <h2>Transaction History</h2>
+                <div style="max-height: 250px; overflow-y: auto;">
                     <table>
                         <thead>
                             <tr>
-                                <th>Time</th>
+                                <th>Date/Time</th>
                                 <th>Items</th>
-                                <th>Total (LKR)</th>
+                                <th>Rev / Profit</th>
                             </tr>
                         </thead>
-                        <tbody id="sales-table-body">
-                            <!-- Populated dynamically -->
-                        </tbody>
+                        <tbody id="sales-table-body"></tbody>
                     </table>
                 </div>
                 <button class="btn btn-danger" onclick="clearData()" style="margin-top: 1rem;">Reset All App Data</button>
@@ -231,11 +237,9 @@
     </div>
 
     <script>
-        // Data States
         let inventory = JSON.parse(localStorage.getItem('mg_inventory')) || [
-            { id: 1, name: 'Acoustic Guitar (Basic)', category: 'Guitars (New/Used)', price: 25000, stock: 5 },
-            { id: 2, name: 'Guitar Strings Set', category: 'Accessories', price: 1200, stock: 25 },
-            { id: 3, name: 'Guitar Capo', category: 'Accessories', price: 800, stock: 15 }
+            { id: 1, name: 'Acoustic Guitar', category: 'Guitars (New/Used)', buyPrice: 20000, price: 25000, stock: 5 },
+            { id: 2, name: 'Guitar Strings Set', category: 'Accessories', buyPrice: 800, price: 1200, stock: 25 }
         ];
         let sales = JSON.parse(localStorage.getItem('mg_sales')) || [];
         let cart = [];
@@ -245,7 +249,6 @@
             localStorage.setItem('mg_sales', JSON.stringify(sales));
         }
 
-        // Tab Switching
         function switchTab(tabName, btn) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -259,28 +262,29 @@
             btn.classList.add('active');
         }
 
-        // Inventory Functions
         function saveItem() {
             const id = document.getElementById('item-id').value;
             const name = document.getElementById('item-name').value;
             const category = document.getElementById('item-category').value;
+            const buyPrice = parseFloat(document.getElementById('item-buy-price').value) || 0;
             const price = parseFloat(document.getElementById('item-price').value);
             const stock = parseInt(document.getElementById('item-stock').value);
 
             if(!name || isNaN(price) || isNaN(stock)) {
-                alert('Please fill out all fields correctly.');
+                alert('Please fill out name, selling price, and stock fields.');
                 return;
             }
 
             if(id) {
                 const item = inventory.find(i => i.id == id);
-                item.name = name; item.category = category; item.price = price; item.stock = stock;
+                item.name = name; item.category = category; item.buyPrice = buyPrice; item.price = price; item.stock = stock;
             } else {
-                inventory.push({ id: Date.now(), name, category, price, stock });
+                inventory.push({ id: Date.now(), name, category, buyPrice, price, stock });
             }
 
             document.getElementById('item-id').value = '';
             document.getElementById('item-name').value = '';
+            document.getElementById('item-buy-price').value = '';
             document.getElementById('item-price').value = '';
             document.getElementById('item-stock').value = '';
 
@@ -296,11 +300,11 @@
                 tbody.innerHTML += `
                     <tr>
                         <td><b>${item.name}</b><br><small>${item.category}</small></td>
-                        <td>${item.price.toLocaleString()}</td>
+                        <td>Buy: ${item.buyPrice.toLocaleString()}<br>Sell: ${item.price.toLocaleString()}</td>
                         <td>${item.stock}</td>
                         <td>
-                            <button onclick="editItem(${item.id})" style="padding:0.2rem 0.5rem;">Edit</button>
-                            <button onclick="deleteItem(${item.id})" style="padding:0.2rem 0.5rem; background:#dc2626; color:#fff; border:none;">Del</button>
+                            <button onclick="editItem(${item.id})" style="padding:0.2rem 0.4rem;">Edit</button>
+                            <button onclick="deleteItem(${item.id})" style="padding:0.2rem 0.4rem; background:#dc2626; color:#fff; border:none;">Del</button>
                         </td>
                     </tr>
                 `;
@@ -312,6 +316,7 @@
             document.getElementById('item-id').value = item.id;
             document.getElementById('item-name').value = item.name;
             document.getElementById('item-category').value = item.category;
+            document.getElementById('item-buy-price').value = item.buyPrice;
             document.getElementById('item-price').value = item.price;
             document.getElementById('item-stock').value = item.stock;
             switchTab('inventory', document.querySelectorAll('.tab-btn')[1]);
@@ -324,7 +329,6 @@
             renderPOSItems();
         }
 
-        // POS Functions
         function renderPOSItems(filter = '') {
             const container = document.getElementById('pos-items-container');
             container.innerHTML = '';
@@ -358,7 +362,7 @@
                 if(cartItem.qty < item.stock) cartItem.qty++;
                 else alert('Not enough stock available!');
             } else {
-                cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });
+                cart.push({ id: item.id, name: item.name, buyPrice: item.buyPrice, price: item.price, qty: 1 });
             }
             renderCart();
         }
@@ -377,12 +381,27 @@
                 total += c.price * c.qty;
                 list.innerHTML += `
                     <li class="cart-item">
-                        <span>${c.name} (x${c.qty})</span>
-                        <span>LKR ${(c.price * c.qty).toLocaleString()} <button onclick="removeFromCart(${index})" style="background:none;border:none;color:red;margin-left:5px;cursor:pointer;">✕</button></span>
+                        <div class="cart-item-details">
+                            <b>${c.name}</b> (x${c.qty})<br>
+                            <small>LKR ${c.price.toLocaleString()} each</small>
+                        </div>
+                        <div>
+                            <button onclick="editCartPrice(${index})" style="padding:0.2rem 0.4rem; font-size:0.8rem;">Edit Price</button>
+                            <button onclick="removeFromCart(${index})" style="background:none;border:none;color:red;font-weight:bold;cursor:pointer;margin-left:5px;">✕</button>
+                        </div>
                     </li>
                 `;
             });
             document.getElementById('cart-total').innerText = total.toLocaleString();
+        }
+
+        function editCartPrice(index) {
+            const current = cart[index];
+            const newPrice = prompt(`Enter new selling price for ${current.name} (LKR):`, current.price);
+            if(newPrice !== null && !isNaN(newPrice) && newPrice.trim() !== "") {
+                cart[index].price = parseFloat(newPrice);
+                renderCart();
+            }
         }
 
         function removeFromCart(index) {
@@ -393,18 +412,25 @@
         function completeCheckout() {
             if(cart.length === 0) return alert('Cart is empty');
             
-            let total = 0;
+            let totalRev = 0;
+            let totalCost = 0;
+            
             cart.forEach(c => {
-                total += c.price * c.qty;
+                totalRev += c.price * c.qty;
+                totalCost += c.buyPrice * c.qty;
                 const invItem = inventory.find(i => i.id == c.id);
                 if(invItem) invItem.stock -= c.qty;
             });
 
+            const profit = totalRev - totalCost;
+
             sales.push({
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                date: new Date().toLocaleDateString(),
+                timestamp: new Date().getTime(),
+                dateStr: new Date().toLocaleDateString(),
+                timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 items: cart.map(c => `${c.name} (x${c.qty})`).join(', '),
-                total: total
+                revenue: totalRev,
+                profit: profit
             });
 
             cart = [];
@@ -415,23 +441,46 @@
             alert('Sale Completed Successfully!');
         }
 
-        // Dashboard
         function updateDashboard() {
-            const today = new Date().toLocaleDateString();
-            let todayRev = 0;
-            sales.filter(s => s.date === today).forEach(s => todayRev += s.total);
+            const filterType = document.getElementById('report-filter').value;
+            const now = new Date();
+            
+            let filteredSales = sales.filter(s => {
+                const sDate = new Date(s.timestamp);
+                if(filterType === 'today') {
+                    return sDate.toDateString() === now.toDateString();
+                } else if(filterType === 'week') {
+                    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                    return sDate >= oneWeekAgo;
+                } else if(filterType === 'month') {
+                    return sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear();
+                }
+                return true; // 'all'
+            });
 
-            document.getElementById('today-revenue').innerText = todayRev.toLocaleString();
-            document.getElementById('total-items-count').innerText = inventory.reduce((acc, item) => acc + item.stock, 0);
+            let totalRev = 0;
+            let totalProf = 0;
+            filteredSales.forEach(s => {
+                totalRev += s.revenue;
+                totalProf += s.profit;
+            });
+
+            document.getElementById('rep-revenue').innerText = totalRev.toLocaleString();
+            document.getElementById('rep-profit').innerText = totalProf.toLocaleString();
 
             const tbody = document.getElementById('sales-table-body');
             tbody.innerHTML = '';
-            sales.slice().reverse().forEach(s => {
+            if(filteredSales.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#6b7280;">No records found</td></tr>';
+                return;
+            }
+
+            filteredSales.slice().reverse().forEach(s => {
                 tbody.innerHTML += `
                     <tr>
-                        <td>${s.date} ${s.time}</td>
+                        <td>${s.dateStr} ${s.timeStr}</td>
                         <td>${s.items}</td>
-                        <td>${s.total.toLocaleString()}</td>
+                        <td>Rev: ${s.revenue.toLocaleString()}<br><span style="color:#047857;">Prof: ${s.profit.toLocaleString()}</span></td>
                     </tr>
                 `;
             });
@@ -444,14 +493,8 @@
             }
         }
 
-        // Initial Load
         renderInventory();
         renderPOSItems();
-
-        // Register Service Worker for PWA
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed', err));
-        }
     </script>
 </body>
 </html>
