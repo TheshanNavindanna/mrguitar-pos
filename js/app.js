@@ -12,7 +12,7 @@ import { mountRentals, newRental, outRentalsCount, overdueRentalsCount } from '.
 import { mountExpenses, editExpense } from './expenses.js';
 import { mountAdmin } from './admin.js';
 
-const APP_VERSION = '2.1.0';
+const APP_VERSION = '2.1.1';
 
 /* ---------------------------------------------------------- navigation */
 

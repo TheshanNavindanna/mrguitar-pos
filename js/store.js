@@ -28,7 +28,12 @@ export const DEFAULT_SETTINGS = {
 
   // ----- whatsapp -----
   whatsappEnabled: true,
-  whatsappAttachPdf: true,          // upload a PDF and put the link in the message
+  // 'text'  — message only, number filled in automatically. Free.
+  // 'share' — real PDF handed to WhatsApp via the phone's share sheet; you pick
+  //           the contact. Free.
+  // 'link'  — PDF uploaded and linked in the message. Needs Firebase Storage,
+  //           which now requires the Blaze billing plan.
+  whatsappMode: 'text',
   whatsappTemplate:
     'Hello {customer},\n' +
     'Thank you for shopping at {shop}.\n\n' +

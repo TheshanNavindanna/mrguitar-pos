@@ -34,15 +34,18 @@ account is now the admin.
 > fire. In that case set `role: "admin"` and `status: "approved"` on your own
 > `/users/<uid>` record by hand in the Firebase console, and add `/meta/seeded: true`.
 
-### c. Enable Storage — only if you want PDF receipts on WhatsApp
+### c. Storage — optional, and **not** needed for PDF receipts
 
-Skip this and WhatsApp receipts still work, just as text instead of a PDF link.
+Firebase **Storage now requires the Blaze (pay-as-you-go) plan**, so it asks you
+to add a card even though receipt-sized files sit well inside the free
+allowance. You do not need it: the *share sheet* mode sends a real PDF for free.
+See [Sending on WhatsApp](#sending-on-whatsapp).
 
-1. Firebase console → **Storage** → **Get started** (the free Spark tier is ample —
-   a receipt PDF is about 7 KB).
+Only if you do upgrade and want the one-tap download link:
+
+1. Firebase console → **Storage** → **Get started**.
 2. **Storage → Rules**, paste the contents of [`storage.rules`](storage.rules), **Publish**.
-3. In the app: **More → Settings → WhatsApp receipts**, tick *Upload a PDF and
-   include the link*.
+3. In the app: **More → Settings → WhatsApp receipts** → *Message + PDF download link*.
 
 ### d. Fill in the shop details
 
@@ -162,8 +165,18 @@ Numbers are accepted in any format — `077 123 4567`, `+94771234567`,
 `0094771234567` all become `94771234567`. The country code is configurable
 (default `94`).
 
-**What the customer gets:** the invoice summary as a WhatsApp message, plus a
-link to the PDF receipt if Storage is enabled.
+**Three ways to send it**, chosen in Settings → *How the receipt is sent*:
+
+| Mode | Customer gets | Taps for you | Cost |
+| --- | --- | --- | --- |
+| **Message only** | Receipt written out as a WhatsApp message | 1 | free |
+| **Message + share sheet PDF** | The real PDF as a chat attachment | 2 — number is auto-filled for the message, then you pick the customer in the share sheet for the file | free |
+| **Message + download link** | Message with a tap-through PDF link | 1 | needs Firebase Blaze plan |
+
+The share-sheet mode is the free way to get an actual PDF into the customer's
+chat. It uses the phone's own share sheet, which is why the contact is chosen
+there — no web page can pre-select a WhatsApp contact for a file. On a desktop
+with no share sheet, the PDF downloads instead so you can attach it manually.
 
 The message wording is a template you control in Settings. Available
 placeholders:
@@ -181,10 +194,10 @@ WhatsApp's link format carries **a recipient number and text only** — there is
 way for any website to attach a file to a specific number's chat. That is
 WhatsApp's design, not a gap here. The options are:
 
-- **What this app does:** upload the PDF, put the link in the message. One tap
-  for the customer, and the number is filled in automatically.
-- **Share sheet** (the *Share* button on the receipt): hands the actual file to
-  WhatsApp, but *you* pick the contact — the number can't be pre-filled.
+- **Share sheet** (*Send PDF* on the receipt): hands the real file to WhatsApp,
+  but *you* pick the contact. Free.
+- **Download link:** number auto-filled and one tap for the customer, but the PDF
+  arrives as a link rather than a file, and needs the Blaze plan.
 - **WhatsApp Business Cloud API:** the only way to push a real PDF attachment to
   a number automatically. Needs a Meta Business account, a verified WhatsApp
   Business number, a backend server, and per-conversation charges.

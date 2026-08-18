@@ -205,6 +205,49 @@ export async function downloadReceiptPdf(sale) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** Wrap the PDF as a File so it can go through the share sheet. */
+export async function receiptFile(sale) {
+  const blob = await buildReceiptPdf(sale);
+  return new File([blob], `${sale.invoiceNo || 'receipt'}.pdf`, { type: 'application/pdf' });
+}
+
+/** True when this device can hand an actual PDF to WhatsApp. */
+export function canSharePdf() {
+  if (!navigator.canShare || !navigator.share) return false;
+  try {
+    const probe = new File([new Blob([''], { type: 'application/pdf' })], 'p.pdf', { type: 'application/pdf' });
+    return navigator.canShare({ files: [probe] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Hand the real PDF to the phone's share sheet — WhatsApp appears in the list and
+ * the file arrives as a proper attachment. The recipient is chosen there, because
+ * no web page can pre-select a WhatsApp contact for a file.
+ */
+export async function shareReceiptPdf(sale) {
+  const file = await receiptFile(sale);
+  if (!canSharePdf()) {
+    // Desktop, or a browser without file sharing: save it and let them attach it.
+    await downloadReceiptPdf(sale);
+    return { shared: false, downloaded: true };
+  }
+  try {
+    await navigator.share({
+      files: [file],
+      title: `Receipt ${sale.invoiceNo || ''}`,
+      text: `${state.settings.shopName || 'Mr. Guitar'} — invoice ${sale.invoiceNo || ''}`
+    });
+    return { shared: true };
+  } catch (err) {
+    if (err?.name === 'AbortError') return { shared: false, cancelled: true };
+    await downloadReceiptPdf(sale);
+    return { shared: false, downloaded: true };
+  }
+}
+
 /* ---------------------------------------------------------------- upload */
 
 /** Upload the PDF and return a public download link, or null if that isn't possible. */
@@ -314,10 +357,13 @@ export async function sendReceiptToWhatsApp(sale, { button, status, phone } = {}
     button.textContent = on ? 'Preparing…' : 'WhatsApp';
   };
 
+  // Older settings used a boolean; treat it as the link mode.
+  const mode = s.whatsappMode || (s.whatsappAttachPdf ? 'link' : 'text');
+
   busy(true);
   let link = null;
 
-  if (s.whatsappAttachPdf !== false) {
+  if (mode === 'link') {
     if (!state.online) {
       setStatus('Offline — sending the receipt as text only.');
     } else {
@@ -327,7 +373,11 @@ export async function sendReceiptToWhatsApp(sale, { button, status, phone } = {}
         setStatus('PDF ready.');
       } catch (err) {
         console.warn('Receipt PDF upload failed', err);
-        setStatus('Could not upload the PDF — sending as text instead.');
+        setStatus(
+          err?.code === 'storage/unauthorized' || err?.code === 'storage/unknown'
+            ? 'Storage is not set up — sending as text instead.'
+            : 'Could not upload the PDF — sending as text instead.'
+        );
       }
     }
   }
@@ -336,6 +386,16 @@ export async function sendReceiptToWhatsApp(sale, { button, status, phone } = {}
   const url = whatsappUrl(number, message);
 
   busy(false);
+
+  // 'share' mode: open the chat with the text, then offer the PDF through the
+  // share sheet. Two taps, no billing account, and the customer gets a real file.
+  if (mode === 'share') {
+    openWhatsApp(url);
+    setStatus('Chat opened. Tap “Send PDF” to attach the receipt file.');
+    toast(number ? `Opening WhatsApp for ${prettyPhone(number)}` : 'Opening WhatsApp', 'success');
+    return { link: null, url, number, mode };
+  }
+
   openWhatsApp(url);
 
   if (link) {

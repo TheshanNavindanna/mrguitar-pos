@@ -135,7 +135,6 @@ const FIELD_KIND = {
   receiptShowCustomer: 'bool',
   receiptShowSavings: 'bool',
   whatsappEnabled: 'bool',
-  whatsappAttachPdf: 'bool',
   receiptHeaderNote: 'textarea',
   whatsappTemplate: 'textarea',
   receiptLogo: 'skip'          // handled separately by the logo picker
@@ -224,7 +223,13 @@ function renderSettings() {
 
     <h4 class="mb mt">WhatsApp receipts</h4>
     ${check('whatsappEnabled', 'Ask for a WhatsApp number at checkout')}
-    ${check('whatsappAttachPdf', 'Upload a PDF and include the link (needs Firebase Storage)')}
+    <label class="field"><span>How the receipt is sent</span>
+      <select id="s-whatsappMode" ${dis}>
+        <option value="text" ${s.whatsappMode === 'text' ? 'selected' : ''}>Message only — free</option>
+        <option value="share" ${s.whatsappMode === 'share' ? 'selected' : ''}>Message + attach PDF from the share sheet — free</option>
+        <option value="link" ${s.whatsappMode === 'link' ? 'selected' : ''}>Message + PDF download link — needs Firebase Storage (Blaze plan)</option>
+      </select></label>
+    <p class="hint" id="wa-mode-hint"></p>
     <label class="field"><span>Country code</span>
       <input type="text" id="s-countryCode" value="${esc(s.countryCode)}" ${dis} placeholder="94"></label>
     <label class="field"><span>Message template</span>
@@ -237,6 +242,7 @@ function renderSettings() {
 
   wireLogoPicker(editable);
   wirePreview();
+  wireWhatsAppMode();
 
   const saveBtn = $('#s-save');
   if (saveBtn) saveBtn.onclick = () => {
@@ -257,6 +263,23 @@ function renderSettings() {
     state.settings = next;
     toast('Settings saved', 'success');
   };
+}
+
+/* ------------------------------------------------------- whatsapp mode */
+
+const MODE_HINT = {
+  text: 'WhatsApp opens on the customer’s number with the receipt written out as a message. Nothing to set up, no cost.',
+  share: 'WhatsApp opens on the number with the message, then "Send PDF" on the receipt hands the actual PDF file to WhatsApp through your phone’s share sheet — you tap the customer there. Free. Works on Android and iPhone; on a desktop the PDF is saved instead so you can attach it yourself.',
+  link: 'The PDF is uploaded and its link goes in the message, so the customer taps once. Firebase Storage now requires the Blaze billing plan — the usage itself is inside the free allowance for receipt-sized files, but Google needs a card on file.'
+};
+
+function wireWhatsAppMode() {
+  const select = $('#s-whatsappMode');
+  const hint = $('#wa-mode-hint');
+  if (!select || !hint) return;
+  const update = () => { hint.textContent = MODE_HINT[select.value] || ''; };
+  select.onchange = update;
+  update();
 }
 
 /* --------------------------------------------------------------- logo */

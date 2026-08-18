@@ -202,12 +202,34 @@ export function showReceipt(sale, { autoWhatsApp = false } = {}) {
       <div id="wa-status" class="hint mt"></div>`,
     footer: `
       <button class="btn btn--ghost" data-print>Print</button>
-      <button class="btn btn--ghost" data-share>Share</button>
+      <button class="btn btn--ghost" data-pdf>Send PDF</button>
       <button class="btn btn--green" data-wa>${hasNumber ? 'WhatsApp' : 'WhatsApp…'}</button>`
   });
 
   m.root.querySelector('[data-print]').onclick = () => printReceipt(sale);
-  m.root.querySelector('[data-share]').onclick = () => shareReceipt(sale);
+
+  m.root.querySelector('[data-pdf]').onclick = async e => {
+    const btn = e.currentTarget;
+    const status = m.root.querySelector('#wa-status');
+    btn.disabled = true;
+    btn.textContent = 'Building…';
+    try {
+      const { shareReceiptPdf } = await import('./share.js');
+      const res = await shareReceiptPdf(sale);
+      if (res.downloaded) {
+        status.textContent = 'This device cannot share files directly — the PDF was saved instead. Attach it in WhatsApp.';
+        toast('PDF saved to your device', 'success');
+      } else if (res.shared) {
+        toast('Receipt shared', 'success');
+      }
+    } catch (err) {
+      console.warn('PDF share failed', err);
+      toast('Could not build the PDF', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Send PDF';
+    }
+  };
 
   const waBtn = m.root.querySelector('[data-wa]');
   waBtn.onclick = async () => {
