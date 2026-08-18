@@ -137,6 +137,36 @@ function showApp() {
   $('#auth-password').value = '';
 }
 
+/* ------------------------------------------------------- offline profile */
+/* Realtime Database keeps no on-disk cache on the web, so a cold start with no
+   connection cannot read /users/<uid>. We remember the last approved profile per
+   account and fall back to it. This only unlocks the UI — every read and write is
+   still enforced by the database rules, so a tampered cache gains nothing. */
+
+const profileKey = uid => `mrguitar.profile.${uid}`;
+
+function cacheProfile(uid, profile) {
+  try {
+    localStorage.setItem(profileKey(uid), JSON.stringify({ ...profile, cachedAt: Date.now() }));
+  } catch { /* quota — not fatal */ }
+}
+
+function cachedProfile(uid) {
+  try {
+    return JSON.parse(localStorage.getItem(profileKey(uid)) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+/** get() with a deadline — offline it can hang instead of rejecting. */
+function getWithTimeout(ref, ms = 6000) {
+  return Promise.race([
+    get(ref),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
 /**
  * Wire the auth listener. `onReady(profile)` runs once the user is signed in AND approved.
  */
@@ -151,15 +181,33 @@ export function initAuth(onReady) {
       return;
     }
 
-    let snap;
+    let snap = null;
+    let offline = false;
     try {
-      snap = await get(R('users', user.uid));
-    } catch (err) {
-      showAuthScreen('Could not reach the database. Check your connection and try again.');
-      return;
+      snap = await getWithTimeout(R('users', user.uid));
+    } catch {
+      offline = true;
     }
 
-    let profile = snap.val();
+    let profile = snap ? snap.val() : null;
+
+    // No answer from the server — run on the last known good profile if we have one.
+    if (offline) {
+      const fallback = cachedProfile(user.uid);
+      if (!fallback || fallback.status !== 'approved') {
+        showAuthScreen('No connection, and this device has no saved session. Connect to the internet and sign in once.');
+        return;
+      }
+      sessionStorage.removeItem('mrguitar.pendingName');
+      state.user = { uid: user.uid, email: user.email };
+      state.profile = fallback;
+      state.role = fallback.role || 'staff';
+      subscribeAll();
+      showApp();
+      emit('auth', fallback);
+      onReady(fallback);
+      return;
+    }
 
     if (!profile) {
       // Account exists in Auth but has no profile record (e.g. admin deleted it).
@@ -172,15 +220,18 @@ export function initAuth(onReady) {
     }
 
     if (profile.status === 'blocked') {
+      localStorage.removeItem(profileKey(user.uid));
       await signOut(auth);
       return showAuthScreen('This account has been blocked. Contact the shop admin.');
     }
 
     if (profile.status !== 'approved') {
+      localStorage.removeItem(profileKey(user.uid));
       await signOut(auth);
       return showAuthScreen('Your account is waiting for admin approval.');
     }
 
+    cacheProfile(user.uid, profile);
     sessionStorage.removeItem('mrguitar.pendingName');
     state.user = { uid: user.uid, email: user.email };
     state.profile = profile;
