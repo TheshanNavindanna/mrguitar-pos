@@ -1,15 +1,33 @@
 {
+  "id": "/mrguitar-pos/",
   "name": "Mr. Guitar POS",
   "short_name": "Mr. Guitar",
-  "start_url": "index.html",
+  "description": "Point of sale, inventory, repairs and rentals for Mr. Guitar, Beliatta.",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#f3f4f6",
-  "theme_color": "#1a1a1a",
+  "theme_color": "#111827",
+  "lang": "en",
+  "categories": ["business", "productivity", "shopping"],
   "icons": [
     {
-      "src": "https://img.icons8.com/ios-filled/512/1a1a1a/guitar.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
+  ],
+  "shortcuts": [
+    { "name": "New sale", "url": "./index.html#pos" },
+    { "name": "Inventory", "url": "./index.html#inventory" },
+    { "name": "Repairs", "url": "./index.html#repairs" }
   ]
 }

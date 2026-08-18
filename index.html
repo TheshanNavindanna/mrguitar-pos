@@ -1,787 +1,366 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mr. Guitar - Beliatta POS</title>
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#1a1a1a">
-    
-    <!-- Firebase App & Auth SDKs -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, set, onValue, get, push, remove } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAmjPncy6Css6xOTF1E97Xb6eZO9tXUhok",
-            authDomain: "mrguitarpos.firebaseapp.com",
-            databaseURL: "https://mrguitarpos-default-rtdb.firebaseio.com",
-            projectId: "mrguitarpos",
-            storageBucket: "mrguitarpos.firebasestorage.app",
-            messagingSenderId: "730797498075",
-            appId: "1:730797498075:web:36e2b2e8a496602c33b6fe",
-            measurementId: "G-H5SMTVZ7MK"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase(app);
-        const auth = getAuth(app);
-
-        window.dbRef = ref;
-        window.dbSet = set;
-        window.dbGet = get;
-        window.dbPush = push;
-        window.dbOnValue = onValue;
-        window.database = db;
-        window.auth = auth;
-        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
-        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
-        window.signOut = signOut;
-        window.onAuthStateChanged = onAuthStateChanged;
-    </script>
-
-    <style>
-        :root {
-            --primary: #d97706;
-            --primary-dark: #b45309;
-            --bg: #f3f4f6;
-            --card-bg: #ffffff;
-            --text: #1f2937;
-            --border: #e5e7eb;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-        body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
-        
-        header {
-            background: #111827;
-            color: white;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 1.1rem;
-            font-weight: bold;
-        }
-
-        .header-actions { display: flex; gap: 0.5rem; }
-        .action-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 0.4rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        .action-btn:active { background: var(--primary-dark); }
-        .btn-danger-header { background: #dc2626; }
-
-        .container { padding: 1rem; max-width: 600px; margin: 0 auto; }
-
-        /* Auth Screen Styling */
-        #auth-screen {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            height: 80vh;
-            padding: 1rem;
-        }
-        .auth-card {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            width: 100%;
-            max-width: 400px;
-            text-align: center;
-        }
-        .auth-card h2 { margin-bottom: 1rem; color: #111827; }
-        .auth-toggle { margin-top: 1rem; font-size: 0.9rem; color: #4b5563; cursor: pointer; }
-        .auth-toggle span { color: var(--primary); font-weight: bold; }
-
-        .app-content { display: none; }
-
-        .tabs {
-    display: flex;
-    flex-wrap: nowrap; /* Ensures all buttons stay on a single line */
-    background: #fff;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    border-top: 1px solid var(--border);
-    z-index: 1000;
-    box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
-}
-
-.tab-btn {
-    flex: 1 1 0; /* Forces buttons to evenly share available space and shrink if necessary */
-    min-width: 0; /* Allows text-overflow ellipsis to work properly in flex items */
-    padding: 0.6rem 0.2rem;
-    background: none;
-    border: none;
-    font-size: 0.7rem;
-    font-weight: bold;
-    color: #4b5563;
-    text-align: center;
-    cursor: pointer;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-        .tab-btn.active {
-            color: var(--primary);
-            border-top: 3px solid var(--primary);
-            background: #fffbeb;
-        }
-        
-
-        .section { display: none; }
-        .section.active { display: block; }
-
-        .card {
-            background: var(--card-bg);
-            border-radius: 8px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: #111827; }
-
-        input, select {
-            width: 100%;
-            padding: 0.75rem;
-            margin-bottom: 0.75rem;
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 1rem;
-        }
-
-        button.btn {
-            width: 100%;
-            padding: 0.85rem;
-            background: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-        }
-        button.btn:active { background: var(--primary-dark); }
-
-        .item-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-            max-height: 250px;
-            overflow-y: auto;
-            margin-bottom: 1rem;
-        }
-        .pos-item-card {
-            background: #f9fafb;
-            border: 1px solid var(--border);
-            padding: 0.75rem;
-            border-radius: 6px;
-            text-align: left;
-            cursor: pointer;
-        }
-        .pos-item-card h4 { font-size: 0.95rem; }
-        .pos-item-card p { font-size: 0.85rem; color: #6b7280; }
-
-        .cart-list { list-style: none; margin-bottom: 1rem; max-height: 180px; overflow-y: auto; }
-        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
-        .cart-item-details { flex-grow: 1; margin-right: 0.5rem; }
-
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem; }
-        .stat-card { background: #fffbeb; border: 1px solid #fde68a; padding: 0.85rem; border-radius: 8px; text-align: center; }
-        .stat-card h3 { font-size: 1.1rem; color: #b45309; }
-        .stat-card p { font-size: 0.8rem; color: #78350f; }
-        
-        table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-        th, td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+<title>Mr. Guitar POS</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#111827">
+<meta name="description" content="Point of sale, inventory, repairs and rentals for Mr. Guitar, Beliatta.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Mr. Guitar">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
-    <header>
-        <span>Mr. Guitar - Beliatta</span>
-        <div class="header-actions" id="header-actions" style="display: none;">
-            <button class="action-btn" onclick="manualSync()">🔄 Refresh</button>
-            <button class="action-btn btn-danger-header" onclick="logoutUser()">Logout</button>
-        </div>
-    </header>
+<!-- ============================================================ BOOT ==== -->
+<div id="boot-screen">
+  <div>
+    <div class="spinner"></div>
+    <p class="muted small">Starting Mr. Guitar POS…</p>
+  </div>
+</div>
 
-    <!-- AUTHENTICATION SCREEN -->
-    <div id="auth-screen">
-        <div class="auth-card">
-            <h2 id="auth-title">Staff Login</h2>
-            <input type="email" id="auth-email" placeholder="Email Address">
-            <input type="password" id="auth-password" placeholder="Password">
-            <button class="btn" id="auth-submit-btn" onclick="handleAuth()">Login</button>
-            <div class="auth-toggle" onclick="toggleAuthMode()">
-                <span id="auth-toggle-text">Need an account? Sign Up</span>
-            </div>
-        </div>
+<!-- ============================================================ AUTH ==== -->
+<div id="auth-screen" hidden>
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="logo">🎸</div>
+      <h1>Mr. Guitar</h1>
+      <p>Beliatta · Point of Sale</p>
     </div>
 
-    <!-- MAIN APP CONTENT (Hidden until logged in) -->
-    <div class="container app-content" id="app-content">
-        <!-- TAB 1: POS CHECKOUT -->
-        <div id="pos-section" class="section active">
-            <div class="card">
-                <h2>Point of Sale (Checkout)</h2>
-                <input type="text" id="pos-search" placeholder="Search item..." oninput="filterPOSItems()">
-                <div class="item-grid" id="pos-items-container"></div>
-            </div>
+    <h2 id="auth-title">Staff login</h2>
+    <div class="alert" id="auth-error" hidden></div>
 
-            <div class="card">
-                <h2>Current Cart</h2>
-                <ul class="cart-list" id="cart-list">
-                    <li style="color: #6b7280; text-align: center;">Cart is empty</li>
-                </ul>
-                <h3 style="margin-bottom: 1rem;">Total: LKR <span id="cart-total">0.00</span></h3>
-                <button class="btn" onclick="completeCheckout()">Complete Sale (Cash)</button>
-            </div>
-        </div>
+    <label class="field" id="auth-name-field" hidden>
+      <span>Full name</span>
+      <input type="text" id="auth-name" autocomplete="name" placeholder="e.g. Kasun Perera">
+    </label>
 
-        <!-- TAB 2: INVENTORY -->
-        <div id="inventory-section" class="section">
-            <div class="card">
-                <h2>Add / Manage Inventory</h2>
-                <input type="hidden" id="item-id">
-                <input type="text" id="item-name" placeholder="Item Name (e.g., Acoustic Guitar)">
-                <select id="item-category">
-                    <option value="Guitars (New/Used)">Guitars (New/Used)</option>
-                    <option value="Accessories">Accessories</option>
-                    <option value="Repair Parts">Repair Parts</option>
-                    <option value="Rentals">Rentals</option>
-                </select>
-                <input type="number" id="item-buy-price" placeholder="Buying Price / Cost (LKR)">
-                <input type="number" id="item-price" placeholder="Selling Price (LKR)">
-                <input type="number" id="item-stock" placeholder="Stock Quantity">
-                <button class="btn" onclick="saveItem()">Save Item to Inventory</button>
-            </div>
+    <label class="field">
+      <span>Email</span>
+      <input type="email" id="auth-email" autocomplete="username" inputmode="email" placeholder="you@example.com">
+    </label>
 
-            <div class="card">
-                <h2>Inventory List</h2>
-                <div style="max-height: 250px; overflow-y: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Buy / Sell (LKR)</th>
-                                <th>Stock</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="inventory-table-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <label class="field">
+      <span>Password</span>
+      <input type="password" id="auth-password" autocomplete="current-password" placeholder="••••••••">
+    </label>
 
-        <!-- TAB 3: DASHBOARD & SALES -->
-        <div id="dashboard-section" class="section">
-            <div class="card">
-                <h2>Sales & Profit Report Filter</h2>
-                <select id="report-filter" onchange="updateDashboard()">
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
-                    <option value="all">All Time</option>
-                </select>
-            </div>
+    <button class="btn btn--block btn--lg" id="auth-submit">Login</button>
 
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <h3 id="rep-revenue">0.00</h3>
-                    <p>Total Revenue</p>
-                </div>
-                <div class="stat-card" style="background:#ecfdf5; border-color:#a7f3d0;">
-                    <h3 id="rep-profit" style="color:#047857;">0.00</h3>
-                    <p style="color:#065f46;">Total Profit</p>
-                </div>
-            </div>
-
-            <div class="card">
-                <h2>Transaction History</h2>
-                <div style="max-height: 250px; overflow-y: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Date/Time</th>
-                                <th>Items</th>
-                                <th>Rev / Profit</th>
-                            </tr>
-                        </thead>
-                        <tbody id="sales-table-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- TAB 4: ADMIN USER MANAGEMENT -->
-        <div id="admin-section" class="section">
-            <div class="card">
-                <h2>Pending & Approved Staff Accounts</h2>
-                <div style="max-height: 300px; overflow-y: auto;">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Email</th>
-                                <th>Status / Role</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="users-table-body"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+    <div class="auth-toggle" id="auth-toggle">
+      <span id="auth-toggle-text">Need an account? <span>Sign up</span></span>
     </div>
+    <button class="auth-link" id="auth-forgot" type="button">Forgot password?</button>
+  </div>
+</div>
 
-    <!-- Navigation Bar -->
-    <div class="tabs app-content" id="app-nav">
-        <button class="tab-btn active" onclick="switchTab('pos', this)">POS</button>
-        <button class="tab-btn" onclick="switchTab('inventory', this)">Inventory</button>
-        <button class="tab-btn" onclick="switchTab('dashboard', this)">Dashboard</button>
-        <button class="tab-btn" onclick="switchTab('admin', this)" id="admin-tab-btn" style="display:none;">Admin</button>
+<!-- ============================================================= APP ==== -->
+<div id="app" hidden>
+
+  <header class="app-header">
+    <div class="app-header__title">
+      <span id="hdr-shop">Mr. Guitar</span>
+      <small id="hdr-user">—</small>
     </div>
+    <span class="pill" id="hdr-status" hidden></span>
+    <button class="icon-btn" id="hdr-refresh" title="Sync now" aria-label="Sync now">⟳</button>
+    <button class="icon-btn" id="hdr-logout" title="Sign out" aria-label="Sign out">⏻</button>
+  </header>
 
-    <script type="module">
-        let inventory = {};
-        let sales = [];
-        let cart = [];
-        let isSignUpMode = false;
-        let currentUserRole = 'staff';
+  <nav class="tabbar" id="tabbar">
+    <button class="tabbar__btn is-active" data-tab="pos"><span class="ico">🧾</span><span>POS</span></button>
+    <button class="tabbar__btn" data-tab="inventory"><span class="ico">📦</span><span>Stock</span></button>
+    <button class="tabbar__btn" data-tab="sales"><span class="ico">💳</span><span>Sales</span></button>
+    <button class="tabbar__btn" data-tab="reports"><span class="ico">📊</span><span>Reports</span></button>
+    <button class="tabbar__btn" data-tab="more"><span class="ico">⋯</span><span>More</span></button>
+  </nav>
 
-        setTimeout(() => {
-            const auth = window.auth;
-            const db = window.database;
+  <main class="app-main">
 
-            window.onAuthStateChanged(auth, async (user) => {
-                if (user) {
-                    const userRef = window.dbRef(db, 'users/' + user.uid);
-                    const snapshot = await window.dbGet(userRef);
-                    
-                    if (!snapshot.exists()) {
-                        window.dbSet(userRef, {
-                            email: user.email,
-                            status: 'pending',
-                            role: 'staff'
-                        });
-                        alert('Account registered! Please wait for admin approval before logging in.');
-                        window.signOut(auth);
-                        return;
-                    }
+    <!-- ------------------------------------------------------- POS ---- -->
+    <section class="section is-active" id="sec-pos">
+      <div class="pos-layout">
 
-                    const userData = snapshot.val();
-                    if (userData.status !== 'approved') {
-                        alert('Your account is pending admin approval.');
-                        window.signOut(auth);
-                        return;
-                    }
+        <div class="pos-layout__items">
+          <div class="card">
+            <div class="row mb">
+              <div class="search-wrap grow">
+                <input type="search" id="pos-search" placeholder="Search name, SKU or scan barcode"
+                       autocomplete="off" enterkeyhint="search">
+              </div>
+              <button class="icon-btn btn--ghost btn" id="pos-scan" title="Barcode mode" style="padding:0 .7rem">📷</button>
+            </div>
+            <div class="chips mb" id="pos-categories"></div>
+            <div class="pos-scroll">
+              <div class="pos-grid" id="pos-items"></div>
+            </div>
+          </div>
+        </div>
 
-                    currentUserRole = userData.role || 'staff';
+        <div class="pos-layout__cart">
+          <div class="card">
+            <div class="card__head">
+              <h2>Cart <span class="sub" id="cart-count">0 items</span></h2>
+              <div class="row">
+                <button class="btn btn--ghost btn--sm" id="cart-hold">Hold</button>
+                <button class="btn btn--ghost btn--sm" id="cart-held">Parked <span id="held-count">0</span></button>
+                <button class="btn btn--ghost btn--sm" id="cart-clear">Clear</button>
+              </div>
+            </div>
 
-                    document.getElementById('auth-screen').style.display = 'none';
-                    document.querySelectorAll('.app-content').forEach(el => el.style.display = 'block');
-                    document.getElementById('header-actions').style.display = 'flex';
-                    
-                    if (currentUserRole === 'admin') {
-                        document.getElementById('admin-tab-btn').style.display = 'block';
-                    } else {
-                        document.getElementById('admin-tab-btn').style.display = 'none';
-                    }
+            <button class="btn btn--ghost btn--block btn--sm mb" id="cart-customer">👤 Walk-in customer</button>
 
-                    loadAppData();
-                } else {
-                    document.getElementById('auth-screen').style.display = 'flex';
-                    document.querySelectorAll('.app-content').forEach(el => el.style.display = 'none');
-                    document.getElementById('header-actions').style.display = 'none';
-                }
-            });
-        }, 500);
+            <div id="cart-lines"></div>
 
-        window.toggleAuthMode = function() {
-            isSignUpMode = !isSignUpMode;
-            document.getElementById('auth-title').innerText = isSignUpMode ? 'Create Staff Account' : 'Staff Login';
-            document.getElementById('auth-submit-btn').innerText = isSignUpMode ? 'Sign Up' : 'Login';
-            document.getElementById('auth-toggle-text').innerText = isSignUpMode ? 'Already have an account? Login' : 'Need an account? Sign Up';
-        }
+            <div class="totals" id="cart-totals"></div>
 
-        window.handleAuth = function() {
-            const email = document.getElementById('auth-email').value;
-            const password = document.getElementById('auth-password').value;
-            const auth = window.auth;
+            <div class="row mt">
+              <button class="btn btn--ghost grow" id="cart-discount">% Discount</button>
+              <button class="btn grow btn--lg" id="cart-charge">Charge</button>
+            </div>
+          </div>
+        </div>
 
-            if(!email || !password) {
-                alert('Please enter both email and password.');
-                return;
-            }
+      </div>
+    </section>
 
-            if(isSignUpMode) {
-                window.createUserWithEmailAndPassword(auth, email, password)
-                    .catch(err => alert(err.message));
-            } else {
-                window.signInWithEmailAndPassword(auth, email, password)
-                    .catch(err => alert(err.message));
-            }
-        }
+    <!-- ------------------------------------------------- INVENTORY ---- -->
+    <section class="section" id="sec-inventory">
+      <div class="card">
+        <div class="card__head">
+          <h2>Inventory</h2>
+          <div class="row">
+            <button class="btn btn--ghost btn--sm" id="inv-export">Export</button>
+            <button class="btn btn--ghost btn--sm" id="inv-import">Import</button>
+            <button class="btn btn--sm" id="inv-add">+ Item</button>
+          </div>
+        </div>
+        <div class="search-wrap mb">
+          <input type="search" id="inv-search" placeholder="Search inventory…" autocomplete="off">
+        </div>
+        <div class="chips" id="inv-filters">
+          <button class="chip is-active" data-filter="all">All</button>
+          <button class="chip" data-filter="low">Low stock</button>
+          <button class="chip" data-filter="out">Out of stock</button>
+        </div>
+      </div>
 
-        window.logoutUser = function() {
-            window.signOut(window.auth).then(() => {
-                alert('Logged out successfully');
-            });
-        }
+      <div class="stats" id="inv-stats"></div>
 
-        function loadAppData() {
-            const db = window.database;
-            
-            window.dbOnValue(window.dbRef(db, 'inventory'), (snapshot) => {
-                inventory = snapshot.val() || {};
-                renderInventory();
-                renderPOSItems();
-            });
+      <div class="card card--flush">
+        <div class="list scroll-y scroll-y--md" id="inv-list"></div>
+      </div>
+    </section>
 
-            window.dbOnValue(window.dbRef(db, 'sales'), (snapshot) => {
-                const data = snapshot.val();
-                sales = [];
-                if(data) {
-                    Object.keys(data).forEach(key => {
-                        sales.push({ id: key, ...data[key] });
-                    });
-                }
-                if(document.getElementById('dashboard-section').classList.contains('active')) {
-                    updateDashboard();
-                }
-            });
+    <!-- ----------------------------------------------------- SALES ---- -->
+    <section class="section" id="sec-sales">
+      <div class="card">
+        <div class="card__head"><h2>Sales history</h2>
+          <button class="btn btn--ghost btn--sm" id="sales-export">Export CSV</button>
+        </div>
+        <div class="chips mb" id="sales-range">
+          <button class="chip is-active" data-range="today">Today</button>
+          <button class="chip" data-range="yesterday">Yesterday</button>
+          <button class="chip" data-range="week">This week</button>
+          <button class="chip" data-range="month">This month</button>
+          <button class="chip" data-range="all">All</button>
+        </div>
+        <div class="search-wrap">
+          <input type="search" id="sales-search" placeholder="Invoice no, customer or item…" autocomplete="off">
+        </div>
+      </div>
 
-            if (currentUserRole === 'admin') {
-                window.dbOnValue(window.dbRef(db, 'users'), (snapshot) => {
-                    renderUsersTable(snapshot.val() || {});
-                });
-            }
-        }
+      <div class="stats" id="sales-stats"></div>
 
-        window.manualSync = async function() {
-            const db = window.database;
-            try {
-                const invSnap = await window.dbGet(window.dbRef(db, 'inventory'));
-                inventory = invSnap.val() || {};
-                
-                const salesSnap = await window.dbGet(window.dbRef(db, 'sales'));
-                const salesData = salesSnap.val();
-                sales = [];
-                if(salesData) {
-                    Object.keys(salesData).forEach(key => {
-                        sales.push({ id: key, ...salesData[key] });
-                    });
-                }
+      <div class="card card--flush">
+        <div class="list scroll-y scroll-y--md" id="sales-list"></div>
+      </div>
+    </section>
 
-                renderInventory();
-                renderPOSItems();
-                if(document.getElementById('dashboard-section').classList.contains('active')) {
-                    updateDashboard();
-                }
-                alert('Data refreshed successfully from cloud!');
-            } catch(e) {
-                alert('Failed to refresh data. Check internet connection.');
-            }
-        }
+    <!-- --------------------------------------------------- REPORTS ---- -->
+    <section class="section" id="sec-reports">
+      <div class="card">
+        <div class="card__head"><h2>Business report</h2>
+          <button class="btn btn--ghost btn--sm" id="rep-export">Export</button>
+        </div>
+        <div class="chips mb" id="rep-range">
+          <button class="chip" data-range="today">Today</button>
+          <button class="chip" data-range="week">This week</button>
+          <button class="chip is-active" data-range="month">This month</button>
+          <button class="chip" data-range="lastmonth">Last month</button>
+          <button class="chip" data-range="all">All time</button>
+          <button class="chip" data-range="custom">Custom</button>
+        </div>
+        <div class="field-row" id="rep-custom" hidden>
+          <label class="field"><span>From</span><input type="date" id="rep-from"></label>
+          <label class="field"><span>To</span><input type="date" id="rep-to"></label>
+        </div>
+      </div>
 
-        window.switchTab = function(tabName, btn) {
-            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            
-            if(tabName === 'pos') document.getElementById('pos-section').classList.add('active');
-            if(tabName === 'inventory') document.getElementById('inventory-section').classList.add('active');
-            if(tabName === 'dashboard') {
-                document.getElementById('dashboard-section').classList.add('active');
-                updateDashboard();
-            }
-            if(tabName === 'admin') document.getElementById('admin-section').classList.add('active');
-            btn.classList.add('active');
-        }
+      <div class="stats" id="rep-stats"></div>
 
-        window.saveItem = function() {
-            const id = document.getElementById('item-id').value;
-            const name = document.getElementById('item-name').value;
-            const category = document.getElementById('item-category').value;
-            const buyPrice = parseFloat(document.getElementById('item-buy-price').value) || 0;
-            const price = parseFloat(document.getElementById('item-price').value);
-            const stock = parseInt(document.getElementById('item-stock').value);
+      <div class="card">
+        <div class="card__head"><h2>Daily revenue</h2></div>
+        <div class="bars" id="rep-chart"></div>
+      </div>
 
-            if(!name || isNaN(price) || isNaN(stock)) {
-                alert('Please fill out name, selling price, and stock fields.');
-                return;
-            }
+      <div class="card">
+        <div class="card__head"><h2>Top selling items</h2></div>
+        <div class="table-wrap"><table><tbody id="rep-top"></tbody></table></div>
+      </div>
 
-            const db = window.database;
-            const itemId = id ? id : 'item_' + Date.now();
+      <div class="card">
+        <div class="card__head"><h2>Payment methods</h2></div>
+        <div class="table-wrap"><table><tbody id="rep-methods"></tbody></table></div>
+      </div>
 
-            window.dbSet(window.dbRef(db, 'inventory/' + itemId), {
-                id: itemId,
-                name,
-                category,
-                buyPrice,
-                price,
-                stock
-            }).then(() => {
-                document.getElementById('item-id').value = '';
-                document.getElementById('item-name').value = '';
-                document.getElementById('item-buy-price').value = '';
-                document.getElementById('item-price').value = '';
-                document.getElementById('item-stock').value = '';
-                alert('Item saved successfully to cloud!');
-            });
-        }
+      <div class="card">
+        <div class="card__head"><h2>Sales by staff</h2></div>
+        <div class="table-wrap"><table><tbody id="rep-staff"></tbody></table></div>
+      </div>
+    </section>
 
-        function renderInventory() {
-            const tbody = document.getElementById('inventory-table-body');
-            tbody.innerHTML = '';
-            Object.keys(inventory).forEach(key => {
-                const item = inventory[key];
-                tbody.innerHTML += `
-                    <tr>
-                        <td><b>${item.name}</b><br><small>${item.category}</small></td>
-                        <td>Buy: ${item.buyPrice.toLocaleString()}<br>Sell: ${item.price.toLocaleString()}</td>
-                        <td>${item.stock}</td>
-                        <td>
-                            <button onclick="editItem('${item.id}')" style="padding:0.2rem 0.4rem;">Edit</button>
-                            <button onclick="deleteItem('${item.id}')" style="padding:0.2rem 0.4rem; background:#dc2626; color:#fff; border:none;">Del</button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
+    <!-- ------------------------------------------------------ MORE ---- -->
+    <section class="section" id="sec-more">
+      <h2 class="section__title">More</h2>
+      <div class="menu-grid" id="more-menu"></div>
+      <p class="tiny muted mt center" id="app-version"></p>
+    </section>
 
-        window.editItem = function(id) {
-            const item = inventory[id];
-            document.getElementById('item-id').value = item.id;
-            document.getElementById('item-name').value = item.name;
-            document.getElementById('item-category').value = item.category;
-            document.getElementById('item-buy-price').value = item.buyPrice;
-            document.getElementById('item-price').value = item.price;
-            document.getElementById('item-stock').value = item.stock;
-            switchTab('inventory', document.querySelectorAll('.tab-btn')[1]);
-        }
+    <!-- ------------------------------------------------- CUSTOMERS ---- -->
+    <section class="section" id="sec-customers">
+      <div class="card">
+        <div class="card__head">
+          <h2>Customers</h2>
+          <button class="btn btn--sm" id="cust-add">+ Customer</button>
+        </div>
+        <div class="search-wrap">
+          <input type="search" id="cust-search" placeholder="Search name or phone…" autocomplete="off">
+        </div>
+      </div>
+      <div class="card card--flush">
+        <div class="list scroll-y scroll-y--md" id="cust-list"></div>
+      </div>
+    </section>
 
-        window.deleteItem = function(id) {
-            const db = window.database;
-            window.dbSet(window.dbRef(db, 'inventory/' + id), null);
-        }
+    <!-- --------------------------------------------------- REPAIRS ---- -->
+    <section class="section" id="sec-repairs">
+      <div class="card">
+        <div class="card__head">
+          <h2>Repair jobs</h2>
+          <button class="btn btn--sm" id="rep-job-add">+ Job</button>
+        </div>
+        <div class="chips" id="repairs-filter">
+          <button class="chip is-active" data-status="open">Open</button>
+          <button class="chip" data-status="received">Received</button>
+          <button class="chip" data-status="in-progress">In progress</button>
+          <button class="chip" data-status="ready">Ready</button>
+          <button class="chip" data-status="delivered">Delivered</button>
+          <button class="chip" data-status="all">All</button>
+        </div>
+      </div>
+      <div class="card card--flush">
+        <div class="list scroll-y scroll-y--md" id="repairs-list"></div>
+      </div>
+    </section>
 
-        function renderPOSItems(filter = '') {
-            const container = document.getElementById('pos-items-container');
-            container.innerHTML = '';
-            
-            const keys = Object.keys(inventory);
-            const filtered = keys.filter(k => inventory[k].name.toLowerCase().includes(filter.toLowerCase()) && inventory[k].stock > 0);
-            
-            if(filtered.length === 0) {
-                container.innerHTML = '<p style="grid-column: span 2; color:#6b7280; text-align:center;">No items found</p>';
-                return;
-            }
+    <!-- --------------------------------------------------- RENTALS ---- -->
+    <section class="section" id="sec-rentals">
+      <div class="card">
+        <div class="card__head">
+          <h2>Rentals</h2>
+          <button class="btn btn--sm" id="rental-add">+ Rent out</button>
+        </div>
+        <div class="chips" id="rentals-filter">
+          <button class="chip is-active" data-status="out">Out</button>
+          <button class="chip" data-status="overdue">Overdue</button>
+          <button class="chip" data-status="returned">Returned</button>
+          <button class="chip" data-status="all">All</button>
+        </div>
+      </div>
+      <div class="card card--flush">
+        <div class="list scroll-y scroll-y--md" id="rentals-list"></div>
+      </div>
+    </section>
 
-            filtered.forEach(k => {
-                const item = inventory[k];
-                container.innerHTML += `
-                    <div class="pos-item-card" onclick="addToCart('${item.id}')">
-                        <h4>${item.name}</h4>
-                        <p>LKR ${item.price.toLocaleString()}</p>
-                        <p><small>Stock: ${item.stock}</small></p>
-                    </div>
-                `;
-            });
-        }
+    <!-- -------------------------------------------------- EXPENSES ---- -->
+    <section class="section" id="sec-expenses">
+      <div class="card">
+        <div class="card__head">
+          <h2>Expenses</h2>
+          <button class="btn btn--sm" id="exp-add">+ Expense</button>
+        </div>
+        <div class="chips" id="exp-range">
+          <button class="chip" data-range="today">Today</button>
+          <button class="chip" data-range="week">This week</button>
+          <button class="chip is-active" data-range="month">This month</button>
+          <button class="chip" data-range="all">All</button>
+        </div>
+      </div>
+      <div class="stats" id="exp-stats"></div>
+      <div class="card card--flush">
+        <div class="list scroll-y scroll-y--md" id="exp-list"></div>
+      </div>
+    </section>
 
-        window.filterPOSItems = function() {
-            renderPOSItems(document.getElementById('pos-search').value);
-        }
+    <!-- ----------------------------------------------------- ADMIN ---- -->
+    <section class="section" id="sec-admin">
+      <div class="card">
+        <div class="card__head"><h2>Staff accounts</h2></div>
+        <p class="tiny muted">New sign-ups stay locked out until you approve them here.</p>
+      </div>
+      <div class="card card--flush">
+        <div class="list" id="admin-users"></div>
+      </div>
+    </section>
 
-        window.addToCart = function(id) {
-            const item = inventory[id];
-            const cartItem = cart.find(c => c.id == id);
+    <!-- -------------------------------------------------- SETTINGS ---- -->
+    <section class="section" id="sec-settings">
+      <div class="card">
+        <div class="card__head"><h2>Shop settings</h2></div>
+        <div id="settings-form"></div>
+      </div>
+      <div class="card">
+        <div class="card__head"><h2>Categories</h2>
+          <button class="btn btn--sm" id="cat-add">+ Category</button>
+        </div>
+        <div class="list" id="cat-list"></div>
+      </div>
+      <div class="card">
+        <div class="card__head"><h2>Data &amp; device</h2></div>
+        <div class="row row--wrap">
+          <button class="btn btn--ghost btn--sm" id="data-backup">Download backup</button>
+          <button class="btn btn--ghost btn--sm" id="data-clearcache">Clear local cache</button>
+        </div>
+        <p class="tiny muted mt" id="data-pending"></p>
+      </div>
+    </section>
 
-            if(cartItem) {
-                if(cartItem.qty < item.stock) cartItem.qty++;
-                else alert('Not enough stock available!');
-            } else {
-                cart.push({ id: item.id, name: item.name, buyPrice: item.buyPrice, price: item.price, qty: 1 });
-            }
-            renderCart();
-        }
+  </main>
 
-        function renderCart() {
-            const list = document.getElementById('cart-list');
-            let total = 0;
-            if(cart.length === 0) {
-                list.innerHTML = '<li style="color: #6b7280; text-align: center;">Cart is empty</li>';
-                document.getElementById('cart-total').innerText = '0.00';
-                return;
-            }
+  <!-- Mobile sticky cart bar (POS tab only) -->
+  <div class="cart-bar" id="cart-bar" hidden>
+    <div class="cart-bar__info">
+      <b id="cart-bar-total">0.00</b>
+      <span id="cart-bar-count">0 items</span>
+    </div>
+    <button class="btn btn--ghost btn--sm" id="cart-bar-view">View</button>
+    <button class="btn" id="cart-bar-charge">Charge</button>
+  </div>
 
-            list.innerHTML = '';
-            cart.forEach((c, index) => {
-                total += c.price * c.qty;
-                list.innerHTML += `
-                    <li class="cart-item">
-                        <div class="cart-item-details">
-                            <b>${c.name}</b> (x${c.qty})<br>
-                            <small>LKR ${c.price.toLocaleString()} each</small>
-                        </div>
-                        <div>
-                            <button onclick="editCartPrice(${index})" style="padding:0.2rem 0.4rem; font-size:0.8rem;">Edit Price</button>
-                            <button onclick="removeFromCart(${index})" style="background:none;border:none;color:red;font-weight:bold;cursor:pointer;margin-left:5px;">✕</button>
-                        </div>
-                    </li>
-                `;
-            });
-            document.getElementById('cart-total').innerText = total.toLocaleString();
-        }
+  <button class="fab" id="fab" hidden>+</button>
+</div>
 
-        window.editCartPrice = function(index) {
-            const current = cart[index];
-            const newPrice = prompt(`Enter new selling price for ${current.name} (LKR):`, current.price);
-            if(newPrice !== null && !isNaN(newPrice) && newPrice.trim() !== "") {
-                cart[index].price = parseFloat(newPrice);
-                renderCart();
-            }
-        }
+<div id="modal-root"></div>
+<div id="toast-root"></div>
+<div id="receipt-print"></div>
 
-        window.removeFromCart = function(index) {
-            cart.splice(index, 1);
-            renderCart();
-        }
-
-        window.completeCheckout = function() {
-            if(cart.length === 0) return alert('Cart is empty');
-            
-            let totalRev = 0;
-            let totalCost = 0;
-            const db = window.database;
-            
-            cart.forEach(c => {
-                totalRev += c.price * c.qty;
-                totalCost += c.buyPrice * c.qty;
-                const invItem = inventory[c.id];
-                if(invItem) {
-                    invItem.stock -= c.qty;
-                    window.dbSet(window.dbRef(db, 'inventory/' + c.id + '/stock'), invItem.stock);
-                }
-            });
-
-            const profit = totalRev - totalCost;
-
-            window.dbPush(window.dbRef(db, 'sales'), {
-                timestamp: new Date().getTime(),
-                dateStr: new Date().toLocaleDateString(),
-                timeStr: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                items: cart.map(c => `${c.name} (x${c.qty})`).join(', '),
-                revenue: totalRev,
-                profit: profit
-            });
-
-            cart = [];
-            renderCart();
-            alert('Sale Completed Successfully & Synced across devices!');
-        }
-
-        window.updateDashboard = function() {
-            const filterType = document.getElementById('report-filter').value;
-            const now = new Date();
-            
-            let filteredSales = sales.filter(s => {
-                const sDate = new Date(s.timestamp);
-                if(filterType === 'today') {
-                    return sDate.toDateString() === now.toDateString();
-                } else if(filterType === 'week') {
-                    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                    return sDate >= oneWeekAgo;
-                } else if(filterType === 'month') {
-                    return sDate.getMonth() === now.getMonth() && sDate.getFullYear() === now.getFullYear();
-                }
-                return true; 
-            });
-
-            let totalRev = 0;
-            let totalProf = 0;
-            filteredSales.forEach(s => {
-                totalRev += s.revenue;
-                totalProf += s.profit;
-            });
-
-            document.getElementById('rep-revenue').innerText = totalRev.toLocaleString();
-            document.getElementById('rep-profit').innerText = totalProf.toLocaleString();
-
-            const tbody = document.getElementById('sales-table-body');
-            tbody.innerHTML = '';
-            if(filteredSales.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;color:#6b7280;">No records found</td></tr>';
-                return;
-            }
-
-            filteredSales.slice().reverse().forEach(s => {
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${s.dateStr} ${s.timeStr}</td>
-                        <td>${s.items}</td>
-                        <td>Rev: ${s.revenue.toLocaleString()}<br><span style="color:#047857;">Prof: ${s.profit.toLocaleString()}</span></td>
-                    </tr>
-                `;
-            });
-        }
-
-        function renderUsersTable(usersObj) {
-            const tbody = document.getElementById('users-table-body');
-            tbody.innerHTML = '';
-            
-            Object.keys(usersObj).forEach(uid => {
-                const u = usersObj[uid];
-                tbody.innerHTML += `
-                    <tr>
-                        <td>${u.email}</td>
-                        <td>
-                            <b>Status:</b> ${u.status} <br>
-                            <b>Role:</b> 
-                            <select onchange="updateUserRole('${uid}', this.value)" style="padding:0.2rem; width:auto; margin-top:4px;">
-                                <option value="staff" ${u.role === 'staff' ? 'selected' : ''}>Staff</option>
-                                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
-                            </select>
-                        </td>
-                        <td>
-                            ${u.status === 'pending' ? `<button onclick="approveUser('${uid}')" style="background:#047857; color:white; padding:0.3rem 0.5rem; border:none; border-radius:4px; cursor:pointer; margin-bottom:4px;">Approve</button>` : ''}
-                            <button onclick="deleteUserRecord('${uid}')" style="background:#dc2626; color:white; padding:0.3rem 0.5rem; border:none; border-radius:4px; cursor:pointer;">Delete</button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-
-        window.approveUser = function(uid) {
-            const db = window.database;
-            window.dbSet(window.dbRef(db, 'users/' + uid + '/status'), 'approved').then(() => {
-                alert('User approved successfully!');
-            });
-        }
-
-        window.updateUserRole = function(uid, newRole) {
-            const db = window.database;
-            window.dbSet(window.dbRef(db, 'users/' + uid + '/role'), newRole);
-        }
-
-        window.deleteUserRecord = function(uid) {
-            if(confirm('Are you sure you want to remove this user profile?')) {
-                const db = window.database;
-                window.dbSet(window.dbRef(db, 'users/' + uid), null);
-            }
-        }
-    </script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

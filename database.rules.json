@@ -1,0 +1,120 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "meta": {
+      "seeded": {
+        ".read": "auth != null",
+        ".write": "auth != null && !data.exists()",
+        ".validate": "newData.isBoolean()"
+      }
+    },
+
+    "users": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'",
+      "$uid": {
+        ".read": "auth != null && ($uid === auth.uid || root.child('users').child(auth.uid).child('role').val() === 'admin')",
+        ".write": "auth != null && (root.child('users').child(auth.uid).child('role').val() === 'admin' || ($uid === auth.uid && !data.exists()))",
+        ".validate": "!newData.exists() || newData.hasChildren(['email', 'status', 'role'])",
+
+        "email": { ".validate": "newData.isString()" },
+        "name": { ".validate": "newData.isString()" },
+        "createdAt": { ".validate": "newData.isNumber()" },
+
+        "status": {
+          ".validate": "newData.isString() && newData.val().matches(/^(pending|approved|blocked)$/) && (root.child('users').child(auth.uid).child('role').val() === 'admin' || !root.child('meta').child('seeded').exists() || newData.val() === 'pending')"
+        },
+
+        "role": {
+          ".validate": "newData.isString() && newData.val().matches(/^(staff|manager|admin)$/) && (root.child('users').child(auth.uid).child('role').val() === 'admin' || !root.child('meta').child('seeded').exists() || newData.val() === 'staff')"
+        },
+
+        "$other": { ".validate": false }
+      }
+    },
+
+    "settings": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "categories": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin'"
+    },
+
+    "counters": {
+      "invoice": {
+        ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+        ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+        ".validate": "newData.isNumber() && (!data.exists() || newData.val() > data.val())"
+      }
+    },
+
+    "inventory": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["sku", "category"],
+      "$itemId": {
+        ".validate": "!newData.exists() || newData.hasChildren(['name', 'price'])",
+        "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 200" },
+        "price": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "buyPrice": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+        "stock": { ".validate": "newData.isNumber()" }
+      }
+    },
+
+    "stockmoves": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'staff'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["timestamp", "itemId"]
+    },
+
+    "customers": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["phone", "name"]
+    },
+
+    "sales": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["timestamp", "invoiceNo", "customerId", "cashierUid"],
+      "$saleId": {
+        ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved' && (!data.exists() || root.child('users').child(auth.uid).child('role').val() !== 'staff')",
+        ".validate": "newData.hasChildren(['timestamp', 'total'])",
+        "total": { ".validate": "newData.isNumber()" },
+        "timestamp": { ".validate": "newData.isNumber()" }
+      }
+    },
+
+    "returns": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'staff' && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["timestamp", "saleId"]
+    },
+
+    "expenses": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'staff' && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() !== 'staff' && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["timestamp"]
+    },
+
+    "repairs": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["timestamp", "status", "customerId"]
+    },
+
+    "rentals": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".indexOn": ["timestamp", "status", "dueAt"]
+    },
+
+    "held": {
+      ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
+      ".write": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'"
+    }
+  }
+}
