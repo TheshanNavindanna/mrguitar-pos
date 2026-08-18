@@ -222,6 +222,21 @@ The shop's internet does not have to be reliable.
   reload or a dead battery.
 - Offline invoices get a temporary `MG-OFF…` number so two tills cannot collide;
   online invoices come from an atomic counter.
+- App code is fetched **network first** with a 3-second timeout, so a deploy
+  reaches every till on its next launch instead of being stuck behind the cache.
+  Below that timeout, or with no signal at all, the cached build is used.
+
+### If a device is stuck on an old version
+
+Open the app once with `?fresh=1` on the end of the address:
+
+```
+https://<your-site>/mrguitar-pos/index.html?fresh=1
+```
+
+That clears every cache and the service worker, then reloads clean. There is also
+**More → Settings → Data & device → Check for updates**, which shows the version
+this device is running.
 - The header shows an **Offline** or **Syncing n** pill whenever there is
   anything queued.
 

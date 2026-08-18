@@ -1,9 +1,20 @@
 /* Mr. Guitar POS service worker.
-   App shell is cached so the till still opens with no internet; Firebase traffic
-   is never cached (the app has its own offline queue for that). */
+ *
+ * Strategy, and why:
+ *   App code (HTML/JS/CSS) is NETWORK FIRST with a short timeout. A till must
+ *   never be stranded on an old build after a deploy — that is worth a few
+ *   hundred milliseconds. When the network is slow or gone, the cached copy is
+ *   served instead, so the shop still opens with no internet.
+ *
+ *   Everything else (icons, CDN libraries) is CACHE FIRST, because those files
+ *   are versioned or never change.
+ *
+ *   Firebase traffic is never cached — the app has its own offline queue.
+ */
 
-const VERSION = 'v2.1.1';
+const VERSION = 'v2.2.0';
 const SHELL_CACHE = `mrguitar-shell-${VERSION}`;
+const NET_TIMEOUT = 3000;
 
 const SHELL = [
   './',
@@ -17,6 +28,7 @@ const SHELL = [
   './js/firebase.js',
   './js/pos.js',
   './js/receipt.js',
+  './js/share.js',
   './js/inventory.js',
   './js/sales.js',
   './js/reports.js',
@@ -25,7 +37,6 @@ const SHELL = [
   './js/rentals.js',
   './js/expenses.js',
   './js/admin.js',
-  './js/share.js',
   './icons/icon.svg'
 ];
 
@@ -46,47 +57,64 @@ self.addEventListener('activate', event => {
   );
 });
 
+/** One of our own source files, where freshness beats speed. */
+function isAppCode(url) {
+  if (url.origin !== self.location.origin) return false;
+  return /\.(html|js|css|json)$/.test(url.pathname) || url.pathname.endsWith('/');
+}
+
+/** Network first, falling back to cache on error or when the network is too slow. */
+async function networkFirst(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  try {
+    const response = await Promise.race([
+      fetch(request),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('slow')), NET_TIMEOUT))
+    ]);
+    if (response && response.status === 200) {
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    if (request.mode === 'navigate') {
+      return (await cache.match('./index.html')) || (await cache.match('./')) || fetch(request);
+    }
+    return fetch(request);
+  }
+}
+
+/** Cache first, refreshed quietly in the background. */
+async function cacheFirst(request) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match(request);
+
+  const update = fetch(request).then(response => {
+    if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
+      cache.put(request, response.clone()).catch(() => {});
+    }
+    return response;
+  }).catch(() => cached);
+
+  return cached || update;
+}
+
 self.addEventListener('fetch', event => {
   const { request } = event;
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
 
-  // Firebase / Google endpoints always go to the network.
-  if (/(firebaseio|googleapis|google-analytics|firebaseinstallations|gstatic)\.com$/.test(url.hostname)
-      && !url.pathname.endsWith('.js')) {
-    return;
-  }
+  // Firebase and analytics endpoints always go straight to the network.
+  if (/(firebaseio|googleapis|google-analytics|firebaseinstallations)\.com$/.test(url.hostname)) return;
 
-  // Navigations: network first so a deployed update is picked up, cache as fallback.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then(response => {
-          const copy = response.clone();
-          caches.open(SHELL_CACHE).then(c => c.put('./index.html', copy));
-          return response;
-        })
-        .catch(() => caches.match('./index.html').then(r => r || caches.match('./')))
-    );
-    return;
-  }
-
-  // Everything else: cache first, refresh in the background.
-  event.respondWith(
-    caches.match(request).then(cached => {
-      const network = fetch(request).then(response => {
-        if (response && response.status === 200 && (response.type === 'basic' || response.type === 'cors')) {
-          const copy = response.clone();
-          caches.open(SHELL_CACHE).then(c => c.put(request, copy));
-        }
-        return response;
-      }).catch(() => cached);
-      return cached || network;
-    })
-  );
+  event.respondWith(isAppCode(url) ? networkFirst(request) : cacheFirst(request));
 });
 
 self.addEventListener('message', event => {
   if (event.data === 'skipWaiting') self.skipWaiting();
+  if (event.data === 'clearCaches') {
+    event.waitUntil(caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))));
+  }
 });

@@ -12,7 +12,7 @@ import { mountRentals, newRental, outRentalsCount, overdueRentalsCount } from '.
 import { mountExpenses, editExpense } from './expenses.js';
 import { mountAdmin } from './admin.js';
 
-const APP_VERSION = '2.1.1';
+const APP_VERSION = '2.2.0';
 
 /* ---------------------------------------------------------- navigation */
 
@@ -187,9 +187,68 @@ function start(profile) {
 
 /* ------------------------------------------------------- service worker */
 
-if ('serviceWorker' in navigator) {
+/**
+ * Escape hatch: opening the app with ?fresh=1 wipes every cache and the service
+ * worker, then reloads clean. This is the fix to hand someone whose till is
+ * stuck on an old build.
+ */
+async function hardRefresh() {
+  try {
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+  } catch (err) {
+    console.warn('Hard refresh failed', err);
+  }
+  // Drop the flag so the reload does not loop.
+  location.replace(location.pathname + location.hash);
+}
+
+export async function checkForUpdate({ silent = false } = {}) {
+  if (!('serviceWorker' in navigator)) return false;
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) return false;
+    await reg.update();
+    if (reg.waiting) {
+      reg.waiting.postMessage('skipWaiting');
+      return true;
+    }
+    if (!silent) toast('You are on the latest version', 'success');
+    return false;
+  } catch {
+    if (!silent) toast('Could not check for updates', 'error');
+    return false;
+  }
+}
+
+if (new URLSearchParams(location.search).has('fresh')) {
+  hardRefresh();
+} else if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW registration failed', err));
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => {
+        // Look for a new build on launch and hourly — a till can stay open all day.
+        reg.update().catch(() => {});
+        setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+      })
+      .catch(err => console.warn('SW registration failed', err));
+
+    // A new worker took over: reload once so the running page uses the new code.
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      // Never interrupt a sale in progress or lose queued writes.
+      if (pendingCount() > 0) return;
+      toast('Updating to the latest version…', 'info');
+      setTimeout(() => location.reload(), 600);
+    });
   });
 }
 

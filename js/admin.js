@@ -490,6 +490,26 @@ function renderPending() {
 
 function mountData() {
   $('#data-backup').onclick = backup;
+
+  $('#data-update').onclick = async e => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    try {
+      // Imported lazily: app.js imports this module, so a static import would cycle.
+      const { checkForUpdate } = await import('./app.js');
+      const found = await checkForUpdate();
+      if (found) toast('New version found — reloading', 'success');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Check for updates';
+    }
+  };
+
+  const version = $('#data-version');
+  if (version) {
+    version.textContent = `App ${window.MRGUITAR?.version || '—'} · if this device is stuck on an old version, open the app with ?fresh=1 on the end of the address.`;
+  }
   $('#data-clearcache').onclick = async () => {
     const ok = await confirmDialog(
       pendingCount()
