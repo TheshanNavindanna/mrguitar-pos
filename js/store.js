@@ -10,11 +10,34 @@ export const DEFAULT_SETTINGS = {
   address: '',
   phone: '',
   currency: 'LKR',
+  countryCode: '94',                // Sri Lanka — used to normalise WhatsApp numbers
   taxPercent: 0,
   lowStockThreshold: 3,
   invoicePrefix: 'MG',
+
+  // ----- receipt template -----
+  receiptWidth: '80mm',             // '80mm' | 'a5'
+  receiptLayout: 'classic',         // 'classic' | 'compact' | 'detailed'
+  receiptLogo: '',                  // small data: URI, set from Settings
+  receiptHeaderNote: '',            // extra header lines (VAT no, tagline…)
+  receiptShowSku: true,
+  receiptShowCashier: true,
+  receiptShowCustomer: true,
+  receiptShowSavings: true,         // "You saved X" line when a discount was given
   receiptFooter: 'Thank you for your business!',
-  receiptWidth: '80mm'
+
+  // ----- whatsapp -----
+  whatsappEnabled: true,
+  whatsappAttachPdf: true,          // upload a PDF and put the link in the message
+  whatsappTemplate:
+    'Hello {customer},\n' +
+    'Thank you for shopping at {shop}.\n\n' +
+    'Invoice: {invoice}\n' +
+    'Date: {date}\n\n' +
+    '{items}\n\n' +
+    'Total: {currency} {total}\n\n' +
+    '{link}\n' +
+    '{footer}'
 };
 
 export const state = {

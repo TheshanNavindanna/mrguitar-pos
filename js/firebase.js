@@ -25,6 +25,25 @@ export const app = initializeApp(firebaseConfig);
 export const db = getDatabase(app);
 export const auth = getAuth(app);
 
+/**
+ * Cloud Storage is loaded on demand — it is only needed when a PDF receipt is
+ * uploaded, and keeping it out of the boot path means the till still starts if
+ * Storage has not been enabled on the project.
+ */
+let storagePromise = null;
+export function loadStorage() {
+  if (!storagePromise) {
+    storagePromise = import('https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js')
+      .then(mod => ({
+        storage: mod.getStorage(app),
+        sRef: mod.ref,
+        uploadBytes: mod.uploadBytes,
+        getDownloadURL: mod.getDownloadURL
+      }));
+  }
+  return storagePromise;
+}
+
 export {
   ref, set, update, get, push, remove, onValue, runTransaction,
   query, orderByChild, limitToLast, serverTimestamp,

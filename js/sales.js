@@ -125,10 +125,16 @@ export function showSale(id) {
     footer: `
       ${canRefund ? '<button class="btn btn--ghost btn--danger" data-refund>Refund</button>' : ''}
       ${num(s.due) > 0 && isManager() ? '<button class="btn btn--green" data-settle>Settle</button>' : ''}
+      <button class="btn btn--ghost" data-whatsapp>WhatsApp</button>
       <button class="btn" data-receipt>Receipt</button>`
   });
 
   m.root.querySelector('[data-receipt]').onclick = () => showReceipt(s);
+
+  m.root.querySelector('[data-whatsapp]').onclick = async e => {
+    const { sendReceiptToWhatsApp } = await import('./share.js');
+    await sendReceiptToWhatsApp(s, { button: e.currentTarget });
+  };
   const refundBtn = m.root.querySelector('[data-refund]');
   if (refundBtn) refundBtn.onclick = () => { m.close(); openRefund(s); };
   const settleBtn = m.root.querySelector('[data-settle]');

@@ -34,10 +34,20 @@ account is now the admin.
 > fire. In that case set `role: "admin"` and `status: "approved"` on your own
 > `/users/<uid>` record by hand in the Firebase console, and add `/meta/seeded: true`.
 
-### c. Fill in the shop details
+### c. Enable Storage — only if you want PDF receipts on WhatsApp
+
+Skip this and WhatsApp receipts still work, just as text instead of a PDF link.
+
+1. Firebase console → **Storage** → **Get started** (the free Spark tier is ample —
+   a receipt PDF is about 7 KB).
+2. **Storage → Rules**, paste the contents of [`storage.rules`](storage.rules), **Publish**.
+3. In the app: **More → Settings → WhatsApp receipts**, tick *Upload a PDF and
+   include the link*.
+
+### d. Fill in the shop details
 
 **More → Settings**: shop name, address, phone, currency, tax %, low-stock level,
-invoice prefix and receipt size (80 mm thermal or A5).
+invoice prefix, and the whole receipt template (below).
 
 ---
 
@@ -70,7 +80,8 @@ it as an app.
 - Attach a customer, or sell to a walk-in
 - Payment: cash (with quick-tender buttons and change calculation), card, bank
   transfer, on-credit, and **split payments** across methods
-- Printable 80 mm / A5 receipt, plus a plain-text version to share on WhatsApp
+- Optional **WhatsApp number** field at checkout (pre-filled from the customer record)
+- Printable 80 mm / A5 receipt, plus WhatsApp delivery — see below
 
 ### Inventory
 - SKU / barcode, brand, category, cost price, selling price, margin
@@ -119,7 +130,74 @@ Sign-ups are locked out until an admin approves them. Three roles:
 
 ---
 
-## 4. Offline behaviour
+## 4. Receipts and WhatsApp
+
+### Changing the receipt
+
+Everything is under **More → Settings → Receipt template** — no code needed:
+
+| Setting | What it does |
+| --- | --- |
+| Paper size | 80 mm thermal roll, or A5/A4 |
+| Layout | **Classic** (name, then qty × price), **Compact** (one line per item), **Detailed** (SKU and per-line totals) |
+| Logo | Any image; shrunk to 240 px and stored with your settings |
+| Extra header lines | VAT number, tagline — one per line |
+| Show SKU / cashier / customer | Individual toggles |
+| "You saved" line | Prints the total discount when there was one |
+| Footer | Your thank-you text |
+
+**Preview receipt** shows a sample invoice with your unsaved changes applied, so
+you can judge it before saving.
+
+The thermal PDF is a single continuous page sized to the content — a 2-line
+receipt is 92 mm tall, a 12-line one is 200 mm. No wasted paper, no page breaks.
+
+### Sending on WhatsApp
+
+At checkout there is an optional **WhatsApp number** box. Leave it blank and
+nothing changes. Fill it in and, as soon as the sale is saved, WhatsApp opens on
+that number with the receipt ready to send.
+
+Numbers are accepted in any format — `077 123 4567`, `+94771234567`,
+`0094771234567` all become `94771234567`. The country code is configurable
+(default `94`).
+
+**What the customer gets:** the invoice summary as a WhatsApp message, plus a
+link to the PDF receipt if Storage is enabled.
+
+The message wording is a template you control in Settings. Available
+placeholders:
+
+```
+{shop} {branch} {customer} {invoice} {date} {items} {total}
+{currency} {paid} {due} {method} {phone} {link} {footer}
+```
+
+You can also send from **Sales → tap an invoice → WhatsApp** at any time later.
+
+### The one limitation
+
+WhatsApp's link format carries **a recipient number and text only** — there is no
+way for any website to attach a file to a specific number's chat. That is
+WhatsApp's design, not a gap here. The options are:
+
+- **What this app does:** upload the PDF, put the link in the message. One tap
+  for the customer, and the number is filled in automatically.
+- **Share sheet** (the *Share* button on the receipt): hands the actual file to
+  WhatsApp, but *you* pick the contact — the number can't be pre-filled.
+- **WhatsApp Business Cloud API:** the only way to push a real PDF attachment to
+  a number automatically. Needs a Meta Business account, a verified WhatsApp
+  Business number, a backend server, and per-conversation charges.
+
+If a phone has no WhatsApp installed, the receipt falls back to copyable text.
+
+**Popup note:** browsers only allow opening a new tab from a direct tap. After a
+sale the app tries to open WhatsApp automatically; if the browser blocks it, the
+green **WhatsApp** button on the receipt is right there — one tap.
+
+---
+
+## 5. Offline behaviour
 
 The shop's internet does not have to be reliable.
 
@@ -139,7 +217,7 @@ tills selling the same item at the same time cannot overwrite each other.
 
 ---
 
-## 5. Layout
+## 6. Layout
 
 ```
 index.html              markup and mount points
@@ -168,7 +246,7 @@ js/
 
 ---
 
-## 6. Notes
+## 7. Notes
 
 - The Firebase web config in `js/firebase.js` is **not** a secret — web API keys
   are public by design. Your protection is the database rules in step 1a.

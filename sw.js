@@ -2,7 +2,7 @@
    App shell is cached so the till still opens with no internet; Firebase traffic
    is never cached (the app has its own offline queue for that). */
 
-const VERSION = 'v2.0.1';
+const VERSION = 'v2.1.0';
 const SHELL_CACHE = `mrguitar-shell-${VERSION}`;
 
 const SHELL = [
@@ -25,6 +25,7 @@ const SHELL = [
   './js/rentals.js',
   './js/expenses.js',
   './js/admin.js',
+  './js/share.js',
   './icons/icon.svg'
 ];
 

@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Firebase Cloud Storage rules for Mr. Guitar POS.
+// Console: Storage -> Rules -> paste this -> Publish.
+//
+// Only signed-in staff can upload a receipt. Reading is open, because the
+// customer opening the WhatsApp link is not signed in — but download URLs carry
+// a long random token, so a receipt cannot be found without being sent the link.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    match /receipts/{year}/{file} {
+      allow read: if true;
+
+      allow write: if request.auth != null
+                   && request.resource.size < 2 * 1024 * 1024
+                   && request.resource.contentType == 'application/pdf';
+
+      allow delete: if request.auth != null;
+    }
+
+    // Nothing else is writable from the app.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

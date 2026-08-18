@@ -126,61 +126,262 @@ function mountUsers() {
 
 /* ------------------------------------------------------------ settings */
 
+// How each setting is edited and read back. Anything not listed is a plain text field.
+const FIELD_KIND = {
+  taxPercent: 'number',
+  lowStockThreshold: 'int',
+  receiptShowSku: 'bool',
+  receiptShowCashier: 'bool',
+  receiptShowCustomer: 'bool',
+  receiptShowSavings: 'bool',
+  whatsappEnabled: 'bool',
+  whatsappAttachPdf: 'bool',
+  receiptHeaderNote: 'textarea',
+  whatsappTemplate: 'textarea',
+  receiptLogo: 'skip'          // handled separately by the logo picker
+};
+
+let pendingLogo = null;        // data: URI staged by the logo picker, saved on Save
+
 function renderSettings() {
   const box = $('#settings-form');
   if (!box) return;
   const s = state.settings;
   const editable = isAdmin();
+  const dis = editable ? '' : 'disabled';
+  pendingLogo = s.receiptLogo || '';
+
+  const check = (key, label) => `
+    <label class="field-check">
+      <input type="checkbox" id="s-${key}" ${s[key] !== false ? 'checked' : ''} ${dis}>
+      <span>${esc(label)}</span></label>`;
 
   box.innerHTML = `
+    <h4 class="mb">Shop</h4>
     <div class="field-row">
       <label class="field"><span>Shop name</span>
-        <input type="text" id="s-shopName" value="${esc(s.shopName)}" ${editable ? '' : 'disabled'}></label>
+        <input type="text" id="s-shopName" value="${esc(s.shopName)}" ${dis}></label>
       <label class="field"><span>Branch</span>
-        <input type="text" id="s-branch" value="${esc(s.branch)}" ${editable ? '' : 'disabled'}></label>
+        <input type="text" id="s-branch" value="${esc(s.branch)}" ${dis}></label>
     </div>
     <label class="field"><span>Address</span>
-      <input type="text" id="s-address" value="${esc(s.address)}" ${editable ? '' : 'disabled'}></label>
+      <input type="text" id="s-address" value="${esc(s.address)}" ${dis}></label>
     <div class="field-row">
       <label class="field"><span>Phone</span>
-        <input type="tel" id="s-phone" value="${esc(s.phone)}" ${editable ? '' : 'disabled'}></label>
+        <input type="tel" id="s-phone" value="${esc(s.phone)}" ${dis}></label>
       <label class="field"><span>Currency</span>
-        <input type="text" id="s-currency" value="${esc(s.currency)}" ${editable ? '' : 'disabled'}></label>
+        <input type="text" id="s-currency" value="${esc(s.currency)}" ${dis}></label>
     </div>
     <div class="field-row--3 field-row">
       <label class="field"><span>Tax %</span>
-        <input type="number" id="s-taxPercent" step="any" inputmode="decimal" value="${esc(s.taxPercent)}" ${editable ? '' : 'disabled'}></label>
+        <input type="number" id="s-taxPercent" step="any" inputmode="decimal" value="${esc(s.taxPercent)}" ${dis}></label>
       <label class="field"><span>Low stock at</span>
-        <input type="number" id="s-lowStockThreshold" inputmode="numeric" value="${esc(s.lowStockThreshold)}" ${editable ? '' : 'disabled'}></label>
+        <input type="number" id="s-lowStockThreshold" inputmode="numeric" value="${esc(s.lowStockThreshold)}" ${dis}></label>
       <label class="field"><span>Invoice prefix</span>
-        <input type="text" id="s-invoicePrefix" value="${esc(s.invoicePrefix)}" ${editable ? '' : 'disabled'}></label>
+        <input type="text" id="s-invoicePrefix" value="${esc(s.invoicePrefix)}" ${dis}></label>
     </div>
-    <label class="field"><span>Receipt size</span>
-      <select id="s-receiptWidth" ${editable ? '' : 'disabled'}>
-        <option value="80mm" ${s.receiptWidth === '80mm' ? 'selected' : ''}>80mm thermal</option>
-        <option value="a5" ${s.receiptWidth === 'a5' ? 'selected' : ''}>A5 / A4 paper</option>
-      </select></label>
+
+    <h4 class="mb mt">Receipt template</h4>
+    <div class="field-row">
+      <label class="field"><span>Paper size</span>
+        <select id="s-receiptWidth" ${dis}>
+          <option value="80mm" ${s.receiptWidth === '80mm' ? 'selected' : ''}>80mm thermal</option>
+          <option value="a5" ${s.receiptWidth === 'a5' ? 'selected' : ''}>A5 / A4 paper</option>
+        </select></label>
+      <label class="field"><span>Layout</span>
+        <select id="s-receiptLayout" ${dis}>
+          <option value="classic" ${s.receiptLayout === 'classic' ? 'selected' : ''}>Classic</option>
+          <option value="compact" ${s.receiptLayout === 'compact' ? 'selected' : ''}>Compact (one line per item)</option>
+          <option value="detailed" ${s.receiptLayout === 'detailed' ? 'selected' : ''}>Detailed (SKU + line totals)</option>
+        </select></label>
+    </div>
+
+    <div class="field">
+      <span>Logo</span>
+      <div class="row row--wrap">
+        <img id="logo-preview" class="logo-preview" src="${esc(s.receiptLogo || '')}" alt=""
+             ${s.receiptLogo ? '' : 'hidden'}>
+        <button class="btn btn--ghost btn--sm" id="logo-pick" ${dis}>Choose image</button>
+        <button class="btn btn--ghost btn--sm text-red" id="logo-clear" ${s.receiptLogo ? '' : 'hidden'} ${dis}>Remove</button>
+      </div>
+      <p class="hint">Shrunk to 240px wide and stored with your settings. Keep it simple — thermal printers are black and white.</p>
+    </div>
+
+    <label class="field"><span>Extra header lines</span>
+      <textarea id="s-receiptHeaderNote" rows="2" placeholder="VAT no, tagline… one per line" ${dis}>${esc(s.receiptHeaderNote)}</textarea></label>
+
+    ${check('receiptShowSku', 'Show SKU next to each item')}
+    ${check('receiptShowCashier', 'Show who served the customer')}
+    ${check('receiptShowCustomer', 'Show the customer name')}
+    ${check('receiptShowSavings', 'Show a “you saved” line when discounted')}
+
     <label class="field"><span>Receipt footer</span>
-      <input type="text" id="s-receiptFooter" value="${esc(s.receiptFooter)}" ${editable ? '' : 'disabled'}></label>
+      <input type="text" id="s-receiptFooter" value="${esc(s.receiptFooter)}" ${dis}></label>
+
+    <div class="row">
+      <button class="btn btn--ghost btn--sm" id="s-preview">Preview receipt</button>
+    </div>
+
+    <h4 class="mb mt">WhatsApp receipts</h4>
+    ${check('whatsappEnabled', 'Ask for a WhatsApp number at checkout')}
+    ${check('whatsappAttachPdf', 'Upload a PDF and include the link (needs Firebase Storage)')}
+    <label class="field"><span>Country code</span>
+      <input type="text" id="s-countryCode" value="${esc(s.countryCode)}" ${dis} placeholder="94"></label>
+    <label class="field"><span>Message template</span>
+      <textarea id="s-whatsappTemplate" rows="8" ${dis}>${esc(s.whatsappTemplate)}</textarea></label>
+    <p class="hint">Placeholders: {shop} {branch} {customer} {invoice} {date} {items} {total} {currency} {paid} {due} {method} {phone} {link} {footer}</p>
+
     ${editable
-      ? '<button class="btn btn--block" id="s-save">Save settings</button>'
+      ? '<button class="btn btn--block mt" id="s-save">Save settings</button>'
       : '<p class="hint">Only an admin can change shop settings.</p>'}`;
+
+  wireLogoPicker(editable);
+  wirePreview();
 
   const saveBtn = $('#s-save');
   if (saveBtn) saveBtn.onclick = () => {
     const next = { ...DEFAULT_SETTINGS };
     Object.keys(DEFAULT_SETTINGS).forEach(key => {
+      const kind = FIELD_KIND[key] || 'text';
+      if (kind === 'skip') return;
       const field = document.getElementById(`s-${key}`);
       if (!field) return;
-      next[key] = key === 'taxPercent' ? num(field.value, 0)
-        : key === 'lowStockThreshold' ? int(field.value, 3)
+      next[key] = kind === 'number' ? num(field.value, 0)
+        : kind === 'int' ? int(field.value, 3)
+        : kind === 'bool' ? !!field.checked
+        : kind === 'textarea' ? field.value
         : field.value.trim();
     });
+    next.receiptLogo = pendingLogo || '';
     dbSet('settings', next);
     state.settings = next;
     toast('Settings saved', 'success');
   };
 }
+
+/* --------------------------------------------------------------- logo */
+
+/** Downscale to 240px wide so the logo stays small enough to live in settings. */
+function shrinkImage(file, maxWidth = 240) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('not an image'));
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function wireLogoPicker(editable) {
+  const pick = $('#logo-pick');
+  const clear = $('#logo-clear');
+  const preview = $('#logo-preview');
+  if (!pick || !editable) return;
+
+  pick.onclick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      if (file.size > 4 * 1024 * 1024) return toast('Pick an image under 4MB', 'error');
+      try {
+        const dataUri = await shrinkImage(file);
+        if (dataUri.length > 120000) return toast('That image is too detailed — try a simpler logo', 'error');
+        pendingLogo = dataUri;
+        preview.src = dataUri;
+        preview.hidden = false;
+        clear.hidden = false;
+        toast('Logo ready — press Save settings', 'info');
+      } catch {
+        toast('Could not read that image', 'error');
+      }
+    };
+    input.click();
+  };
+
+  clear.onclick = () => {
+    pendingLogo = '';
+    preview.hidden = true;
+    clear.hidden = true;
+    toast('Logo removed — press Save settings', 'info');
+  };
+}
+
+/* ------------------------------------------------------------ preview */
+
+/** Show the template against a fake sale so changes can be judged before saving. */
+function wirePreview() {
+  const btn = $('#s-preview');
+  if (!btn) return;
+  btn.onclick = async () => {
+    // Apply the unsaved form values so the preview reflects what is on screen.
+    const draft = { ...state.settings };
+    Object.keys(DEFAULT_SETTINGS).forEach(key => {
+      const kind = FIELD_KIND[key] || 'text';
+      if (kind === 'skip') return;
+      const field = document.getElementById(`s-${key}`);
+      if (!field) return;
+      draft[key] = kind === 'number' ? num(field.value, 0)
+        : kind === 'int' ? int(field.value, 3)
+        : kind === 'bool' ? !!field.checked
+        : field.value;
+    });
+    draft.receiptLogo = pendingLogo || '';
+
+    const saved = state.settings;
+    state.settings = draft;
+    try {
+      const { receiptHTML } = await import('./receipt.js');
+      openModal({
+        title: 'Receipt preview',
+        size: 'narrow',
+        body: `<div class="receipt-preview">${receiptHTML(SAMPLE_SALE)}</div>`,
+        onClose: () => { state.settings = saved; }
+      });
+    } catch {
+      state.settings = saved;
+      toast('Could not build the preview', 'error');
+    }
+  };
+}
+
+const SAMPLE_SALE = {
+  invoiceNo: 'MG-00042',
+  timestamp: Date.now(),
+  cashierName: 'Sample Staff',
+  customerName: 'Nimal Silva',
+  lines: [
+    { name: 'Yamaha F310 Acoustic', sku: 'YF310', qty: 1, unitPrice: 32000, buyPrice: 20000, discount: 2000, lineTotal: 30000 },
+    { name: 'Ernie Ball Slinky Strings', sku: 'EB2221', qty: 2, unitPrice: 2200, buyPrice: 1200, discount: 0, lineTotal: 4400 }
+  ],
+  subtotal: 36400,
+  itemDiscount: 2000,
+  discount: 400,
+  taxPercent: 0,
+  tax: 0,
+  total: 34000,
+  payments: [{ method: 'cash', amount: 34000 }],
+  change: 1000,
+  due: 0,
+  status: 'completed',
+  note: ''
+};
 
 /* ---------------------------------------------------------- categories */
 

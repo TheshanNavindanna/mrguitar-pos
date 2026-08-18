@@ -1,7 +1,7 @@
 // The register: item picking, cart maths, payment and checkout.
 import {
   state, on, emit, dbPush, dbSet, dbDelete, stockDelta, nextInvoiceNo,
-  inventoryList, itemById, categoryNames
+  inventoryList, itemById, categoryNames, customerById
 } from './store.js';
 import {
   $, $$, esc, money, num, int, r2, uid, toast, openModal, confirmDialog,
@@ -436,6 +436,7 @@ export function openPayment() {
   let method = 'cash';
   let tendered = t.total;
   const splits = [];
+  const customerPhone = customerById(cart.customerId)?.phone || '';
 
   const rounded = n => Math.ceil(n / 100) * 100;
   const quick = [...new Set([t.total, rounded(t.total), rounded(t.total) + 500, rounded(t.total) + 1000, 5000])]
@@ -473,6 +474,14 @@ export function openPayment() {
 
       <div id="split-list"></div>
       <button class="btn btn--ghost btn--block btn--sm mb" id="split-add">+ Split payment</button>
+
+      ${state.settings.whatsappEnabled === false ? '' : `
+      <label class="field">
+        <span>WhatsApp number (optional)</span>
+        <input type="tel" id="pay-whatsapp" inputmode="tel" autocomplete="tel"
+               value="${esc(customerPhone)}" placeholder="e.g. 077 123 4567">
+      </label>
+      <p class="hint">Leave blank to skip. If filled, WhatsApp opens on that number with the receipt right after the sale.</p>`}
 
       <label class="field">
         <span>Note (optional)</span>
@@ -571,16 +580,24 @@ export function openPayment() {
       tendered = tenderedNow;
     }
 
+    const waField = m.root.querySelector('#pay-whatsapp');
+    const whatsapp = waField ? waField.value.trim() : '';
+    if (whatsapp) {
+      const { isValidPhone } = await import('./share.js');
+      if (!isValidPhone(whatsapp)) return toast('That WhatsApp number does not look valid', 'error');
+    }
+
     btn.disabled = true;
     btn.textContent = 'Saving…';
     try {
       const sale = await completeSale({
         payments,
         change: method === 'credit' ? 0 : r2(num($t.value) - r2(t.total - splitTotal())),
-        note: m.root.querySelector('#pay-note').value.trim()
+        note: m.root.querySelector('#pay-note').value.trim(),
+        whatsapp
       });
       m.close();
-      showReceipt(sale);
+      showReceipt(sale, { autoWhatsApp: !!whatsapp });
     } catch (err) {
       console.error(err);
       btn.disabled = false;
@@ -594,7 +611,7 @@ export function openPayment() {
 
 /* ------------------------------------------------------------ checkout */
 
-export async function completeSale({ payments, change, note }) {
+export async function completeSale({ payments, change, note, whatsapp }) {
   const t = cartTotals();
   const invoiceNo = await nextInvoiceNo();
   const now = Date.now();
@@ -623,6 +640,8 @@ export async function completeSale({ payments, change, note }) {
     cashierName: state.profile?.name || state.user?.email || '',
     customerId: cart.customerId || null,
     customerName: cart.customerName || '',
+    customerPhone: customerById(cart.customerId)?.phone || '',
+    whatsapp: whatsapp || '',
     lines,
     itemsText: lines.map(l => `${l.name} (x${l.qty})`).join(', '),
     subtotal: t.subtotal,
