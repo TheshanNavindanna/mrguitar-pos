@@ -452,6 +452,175 @@ function mountCategories() {
   renderCategories();
 }
 
+/* -------------------------------------------------------------- reset */
+
+/**
+ * Opening-day reset. Clears the trading records but never touches staff
+ * accounts, shop settings or the admin bootstrap flag — losing those would lock
+ * everyone out of the app.
+ */
+const RESET_TARGETS = [
+  {
+    key: 'inventory',
+    label: 'Products & stock',
+    hint: 'Every item, with its prices and quantities',
+    paths: ['inventory', 'stockmoves'],
+    count: () => Object.keys(state.inventory || {}).length
+  },
+  {
+    key: 'sales',
+    label: 'Sales, invoices & refunds',
+    hint: 'All till history, and the invoice number restarts at 1',
+    paths: ['sales', 'returns', 'counters/invoice', 'held'],
+    count: () => state.sales.length
+  },
+  {
+    key: 'customers',
+    label: 'Customers',
+    hint: 'Customer records and their purchase links',
+    paths: ['customers'],
+    count: () => Object.keys(state.customers || {}).length
+  },
+  {
+    key: 'repairs',
+    label: 'Repair jobs',
+    hint: 'Every job card',
+    paths: ['repairs'],
+    count: () => state.repairs.length
+  },
+  {
+    key: 'rentals',
+    label: 'Rentals',
+    hint: 'Rental records, out and returned',
+    paths: ['rentals'],
+    count: () => state.rentals.length
+  },
+  {
+    key: 'expenses',
+    label: 'Expenses',
+    hint: 'Expense log used by the profit report',
+    paths: ['expenses'],
+    count: () => state.expenses.length
+  }
+];
+
+const CONFIRM_WORD = 'RESET';
+
+function openReset() {
+  if (!isAdmin()) return toast('Only an admin can reset the shop data', 'error');
+
+  const m = openModal({
+    title: 'Start fresh for business',
+    body: `
+      <p class="small mb">Tick what should be wiped. Your staff accounts, roles and
+      shop settings are always kept, so nobody gets locked out.</p>
+
+      <div id="reset-list">
+        ${RESET_TARGETS.map(t => `
+          <label class="field-check" style="align-items:flex-start">
+            <input type="checkbox" data-target="${esc(t.key)}" checked>
+            <span>
+              <b>${esc(t.label)}</b>
+              <span class="badge badge--mute">${t.count()}</span><br>
+              <span class="tiny muted">${esc(t.hint)}</span>
+            </span>
+          </label>`).join('')}
+      </div>
+
+      <hr class="mt mb" style="border:0;border-top:1px solid var(--border)">
+
+      <label class="field-check">
+        <input type="checkbox" id="reset-backup" checked>
+        <span>Download a backup first (strongly recommended)</span></label>
+
+      <div class="alert mt">
+        This permanently deletes the selected records from the cloud, on every
+        device. It cannot be undone.
+      </div>
+
+      <label class="field"><span>Type ${CONFIRM_WORD} to confirm</span>
+        <input type="text" id="reset-word" autocomplete="off" autocapitalize="characters" placeholder="${CONFIRM_WORD}"></label>
+
+      <p class="hint" id="reset-status"></p>`,
+    footer: `
+      <button class="btn btn--ghost" data-close>Cancel</button>
+      <button class="btn btn--danger" id="reset-go" disabled>Erase &amp; start fresh</button>`
+  });
+
+  const word = m.root.querySelector('#reset-word');
+  const go = m.root.querySelector('#reset-go');
+  const status = m.root.querySelector('#reset-status');
+
+  word.addEventListener('input', () => {
+    go.disabled = word.value.trim().toUpperCase() !== CONFIRM_WORD;
+  });
+
+  go.onclick = async () => {
+    const chosen = RESET_TARGETS.filter(t =>
+      m.root.querySelector(`[data-target="${t.key}"]`)?.checked);
+    if (!chosen.length) return toast('Nothing selected', 'warn');
+
+    if (!state.online) {
+      return toast('You need an internet connection to reset', 'error');
+    }
+
+    go.disabled = true;
+    go.textContent = 'Erasing…';
+
+    try {
+      if (m.root.querySelector('#reset-backup').checked) {
+        status.textContent = 'Saving a backup…';
+        backup();
+        await new Promise(r => setTimeout(r, 700));
+      }
+
+      // Direct writes, not the offline queue: this must be online and must
+      // surface a real error rather than being retried in the background.
+      const { R, set } = await import('./firebase.js');
+      const paths = chosen.flatMap(t => t.paths);
+      const failed = [];
+
+      for (const path of paths) {
+        status.textContent = `Clearing ${path}…`;
+        try {
+          await set(R(path), null);
+        } catch (err) {
+          console.error('Reset failed for', path, err);
+          failed.push(`${path} (${err?.code || err?.message || 'error'})`);
+        }
+      }
+
+      if (failed.length) {
+        status.textContent = '';
+        go.disabled = false;
+        go.textContent = 'Erase & start fresh';
+        return openModal({
+          title: 'Some records could not be cleared',
+          size: 'narrow',
+          body: `
+            <p class="small mb">These paths were refused by the database rules:</p>
+            <ul class="small">${failed.map(f => `<li>${esc(f)}</li>`).join('')}</ul>
+            <p class="hint mt">Publish the latest <code>database.rules.json</code> in the
+            Firebase console and try again. Everything else was cleared.</p>`
+        });
+      }
+
+      status.textContent = 'Clearing this device…';
+      ['mrguitar.cache.v1', 'mrguitar.outbox.v1', 'mrguitar.outbox.failed.v1', 'mrguitar.cart.v1']
+        .forEach(k => localStorage.removeItem(k));
+
+      toast('Shop data cleared — ready for business', 'success', 4000);
+      setTimeout(() => location.reload(), 1200);
+    } catch (err) {
+      console.error(err);
+      status.textContent = '';
+      go.disabled = false;
+      go.textContent = 'Erase & start fresh';
+      toast('Reset failed: ' + (err?.message || 'unknown error'), 'error');
+    }
+  };
+}
+
 /* --------------------------------------------------------------- data */
 
 function backup() {
@@ -505,6 +674,12 @@ function mountData() {
       btn.textContent = 'Check for updates';
     }
   };
+
+  const danger = $('#danger-card');
+  const resetBtn = $('#data-reset');
+  if (danger) danger.hidden = !isAdmin();
+  if (resetBtn) resetBtn.onclick = openReset;
+  on('auth', () => { if (danger) danger.hidden = !isAdmin(); });
 
   const version = $('#data-version');
   if (version) {

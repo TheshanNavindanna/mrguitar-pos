@@ -12,7 +12,7 @@
  *   Firebase traffic is never cached — the app has its own offline queue.
  */
 
-const VERSION = 'v2.2.0';
+const VERSION = 'v2.3.0';
 const SHELL_CACHE = `mrguitar-shell-${VERSION}`;
 const NET_TIMEOUT = 3000;
 

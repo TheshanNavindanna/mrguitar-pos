@@ -149,6 +149,23 @@ async function runOp(op) {
   }
 }
 
+const MAX_TRIES = 5;
+const DEAD_KEY = 'mrguitar.outbox.failed.v1';
+
+/** Ops that will never succeed are parked here rather than blocking the queue. */
+function park(op, err) {
+  try {
+    const dead = JSON.parse(localStorage.getItem(DEAD_KEY) || '[]');
+    dead.push({ ...op, error: String(err?.message || err), parkedAt: Date.now() });
+    localStorage.setItem(DEAD_KEY, JSON.stringify(dead.slice(-50)));
+  } catch { /* ignore */ }
+}
+
+export const failedOps = () => {
+  try { return JSON.parse(localStorage.getItem(DEAD_KEY) || '[]'); } catch { return []; }
+};
+export const clearFailedOps = () => localStorage.removeItem(DEAD_KEY);
+
 export async function flushOutbox() {
   if (flushing || !state.online) return;
   flushing = true;
@@ -159,8 +176,18 @@ export async function flushOutbox() {
       try {
         await runOp(op);
       } catch (err) {
-        console.warn('Outbox op failed, will retry', op, err);
-        break; // keep order; retry on next connect
+        // A rejected write (usually a rules denial) would otherwise sit at the
+        // head of the queue forever and strand every sale behind it.
+        op._tries = (op._tries || 0) + 1;
+        if (op._tries < MAX_TRIES) {
+          ops[0] = op;
+          writeOutbox(ops);
+          console.warn(`Outbox op failed (try ${op._tries}), will retry`, op, err);
+          break;
+        }
+        console.error('Outbox op failed permanently, parking it', op, err);
+        park(op, err);
+        emit('outbox-failed', op);
       }
       ops = readOutbox().filter(o => o._id !== op._id);
       writeOutbox(ops);

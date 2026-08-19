@@ -245,7 +245,36 @@ tills selling the same item at the same time cannot overwrite each other.
 
 ---
 
-## 6. Layout
+## 6. Starting fresh for real trading
+
+When you have finished testing and want the shop to open with clean books:
+
+**More → Settings → Start fresh → Erase shop data…** (admin only)
+
+Tick what to wipe — products and stock, sales and invoices, customers, repairs,
+rentals, expenses — each showing how many records it holds. A backup downloads
+first by default, and you must type `RESET` to arm the button.
+
+**Always kept:** staff accounts and roles, shop settings, the receipt template
+and your WhatsApp settings. Nobody gets locked out and nothing needs
+reconfiguring.
+
+Clearing sales also resets the invoice counter, so your first real sale is
+number `00001`.
+
+The reset needs the current [`database.rules.json`](database.rules.json)
+published — the rules grant an admin permission to clear the sales node and
+nothing else. If you see "Some records could not be cleared", publish the rules
+and run it again.
+
+> Prefer to do it by hand? Firebase console → Realtime Database → delete the
+> `inventory`, `sales`, `returns`, `stockmoves`, `customers`, `repairs`,
+> `rentals`, `expenses`, `held` and `counters` nodes. Leave `users`, `settings`,
+> `categories` and `meta` alone.
+
+---
+
+## 7. Layout
 
 ```
 index.html              markup and mount points
@@ -274,7 +303,7 @@ js/
 
 ---
 
-## 7. Notes
+## 8. Notes
 
 - The Firebase web config in `js/firebase.js` is **not** a secret — web API keys
   are public by design. Your protection is the database rules in step 1a.
