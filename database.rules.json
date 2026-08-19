@@ -79,7 +79,6 @@
 
     "sales": {
       ".read": "auth != null && root.child('users').child(auth.uid).child('status').val() === 'approved'",
-      "//": "Node-level write allows an admin to CLEAR the whole node (opening-day reset) and nothing else — newData must not exist.",
       ".write": "auth != null && root.child('users').child(auth.uid).child('role').val() === 'admin' && !newData.exists()",
       ".indexOn": ["timestamp", "invoiceNo", "customerId", "cashierUid"],
       "$saleId": {
